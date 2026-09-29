@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cadastro</title>
+  <link rel="stylesheet" href="/dashboard.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <p class="eyebrow">TikTok Live Studio</p>
+      <h1>Criar conta</h1>
+      <p class="lede">A conta fica só neste computador. Cada pessoa acompanha a própria live.</p>
+    </header>
+    <section class="panel">
+      <form id="auth-form" class="auth-form" data-action="/api/register">
+        <div>
+          <label for="username">Nome</label>
+          <input id="username" name="username" type="text" autocomplete="username" minlength="3" maxlength="32" required />
+        </div>
+        <div>
+          <label for="password">Senha</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" minlength="6" required />
+        </div>
+        <button type="submit">Cadastrar</button>
+      </form>
+      <p id="auth-error" class="auth-error"></p>
+      <p class="auth-switch">Já tem conta? <a href="/login">Entrar</a></p>
+    </section>
+  </main>
+  <script src="/auth.js" type="module"></script>
+</body>
+</html>

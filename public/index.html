@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rankings da live</title>
+  <link rel="stylesheet" href="/dashboard.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow">TikTok Live Studio</p>
+          <h1>Rankings da live</h1>
+        </div>
+        <div class="account-bar">
+          <span id="account-name"></span>
+          <button id="logout-btn" type="button" class="ghost">Sair</button>
+        </div>
+      </div>
+      <p class="lede">Esta conta neste computador monitora só a live que você conectar. Cole as URLs como fonte Link no Live Studio.</p>
+    </header>
+
+    <section class="panel connect-panel">
+      <form id="connect-form" class="connect-form">
+        <label for="unique-id">@ da conta</label>
+        <div class="connect-row">
+          <input id="unique-id" name="uniqueId" type="text" placeholder="seunome" autocomplete="off" spellcheck="false" />
+          <button id="connect-btn" type="submit">Conectar</button>
+          <button id="disconnect-btn" type="button" class="ghost" disabled>Desconectar</button>
+          <button id="reset-btn" type="button" class="ghost" disabled>Zerar ranking</button>
+        </div>
+      </form>
+      <div class="status-line">
+        <span id="status-pill" class="pill idle">Desconectado</span>
+        <p id="status-message"></p>
+      </div>
+      <dl class="stats">
+        <div><dt>Espectadores</dt><dd id="stat-viewers">0</dd></div>
+        <div><dt>Curtidas da live</dt><dd id="stat-likes">0</dd></div>
+        <div><dt>Curtidas no ranking</dt><dd id="stat-tracked">0</dd></div>
+        <div><dt>Diamantes</dt><dd id="stat-diamonds">0</dd></div>
+        <div><dt>Estimativa</dt><dd id="stat-usd">US$ 0,00</dd></div>
+      </dl>
+    </section>
+
+    <section class="urls">
+      <article class="panel">
+        <header>
+          <h2>Top curtidas</h2>
+          <button type="button" class="copy" data-copy="likes">Copiar URL</button>
+        </header>
+        <label class="top-label" for="top-count">Posições no overlay</label>
+        <input id="top-count" type="number" min="1" max="20" value="5" />
+        <code id="url-likes"></code>
+        <ol id="preview-likes" class="preview"></ol>
+      </article>
+      <article class="panel">
+        <header>
+          <h2>Top presentes</h2>
+          <button type="button" class="copy" data-copy="gifts">Copiar URL</button>
+        </header>
+        <p class="hint">Ordem por diamantes gastos nesta conexão.</p>
+        <code id="url-gifts"></code>
+        <ol id="preview-gifts" class="preview"></ol>
+      </article>
+    </section>
+
+    <section class="panel limits">
+      <h2>Limites</h2>
+      <ul>
+        <li>A conta precisa estar em live no momento da conexão.</li>
+        <li>Ao conectar, o painel guarda o último status da live: espectadores, total de curtidas e o ranking de presentes que o TikTok já está mostrando. Isso permanece até você zerar.</li>
+        <li>Zerar ranking descarta esse status. Depois disso, curtidas e presentes contam só o que chegar em seguida.</li>
+        <li>O ranking de quem mais curtiu não tem histórico por pessoa. Essa lista começa a preencher depois da conexão.</li>
+        <li>A estimativa em dólar usa US$ 0,005 por diamante, a faixa comum do que o criador recebe. O valor pago de fato muda por país e pelo preço das moedas.</li>
+        <li>Os links do overlay são desta conta. Outra pessoa neste computador usa os links da própria conta.</li>
+      </ul>
+    </section>
+  </main>
+  <script src="/dashboard.js" type="module"></script>
+</body>
+</html>

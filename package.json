@@ -1,0 +1,13 @@
+{
+  "name": "tiktok-live-rankings",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.18.3"
+  }
+}
