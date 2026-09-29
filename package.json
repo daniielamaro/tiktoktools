@@ -7,6 +7,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "sharp": "^0.35.5",
     "tiktok-live-connector": "^2.5.0",
     "ws": "^8.18.3"
   }

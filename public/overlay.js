@@ -53,6 +53,21 @@ function initial(name) {
   return letter ? letter.toUpperCase() : "?";
 }
 
+const warmed = new Set();
+
+function preload(url) {
+  if (!url || warmed.has(url)) return;
+  warmed.add(url);
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
+}
+
+function warmImages() {
+  preload(mode === "gifts" ? "/assets/moeda.png" : "/assets/coracao.png");
+  for (const place of ["1", "2", "3"]) preload(frameUrl(place));
+}
+
 function applyTitle() {
   const style = currentStyle();
   const text = String(style.title || "").trim();
@@ -66,101 +81,161 @@ function applyTitle() {
   title.textContent = "";
 }
 
-function portrait(name, avatarUrl, framed) {
-  let face;
-  if (avatarUrl) {
-    face = document.createElement("img");
+function rowSpec(row, place) {
+  const frame = place <= 3 ? frameUrl(String(place)) : "";
+  const name = row.nickname || row.uniqueId;
+  const amount = mode === "gifts" ? row.diamonds : row.likes;
+  return {
+    key: `${row.uniqueId || name}|${frame ? "medal" : "plain"}|${frame}`,
+    place,
+    frame,
+    name,
+    avatar: row.avatar || "",
+    amount: numberFormat.format(amount || 0),
+    nameColor: nameColorFor(place),
+    scoreColor: textColor(currentStyle().scoreColor, "#ffffff"),
+    icon: mode === "gifts" ? "/assets/moeda.png" : "/assets/coracao.png",
+  };
+}
+
+function fillPerson(person, spec) {
+  const who = person.querySelector(".name");
+  who.textContent = spec.name;
+  who.style.color = spec.nameColor;
+  const score = person.querySelector(".score");
+  score.style.color = spec.scoreColor;
+  person.querySelector(".score-value").textContent = spec.amount;
+}
+
+function samePicture(current, next) {
+  if (!current || current === next) return current === next;
+  try {
+    const left = new URL(current, location.origin);
+    const right = new URL(next, location.origin);
+    return left.origin === right.origin && left.pathname === right.pathname;
+  } catch {
+    return false;
+  }
+}
+
+function setFace(medal, spec) {
+  const current = medal.querySelector(".avatar, .fallback");
+  if (spec.avatar) {
+    if (current?.classList.contains("avatar") && samePicture(current.getAttribute("src"), spec.avatar)) return;
+    const face = document.createElement("img");
     face.className = "avatar";
     face.alt = "";
+    face.decoding = "async";
     face.referrerPolicy = "no-referrer";
-    face.src = avatarUrl;
+    face.src = spec.avatar;
     face.addEventListener("error", () => {
       const fallback = document.createElement("span");
       fallback.className = "fallback";
-      fallback.textContent = initial(name);
+      fallback.textContent = initial(spec.name);
       face.replaceWith(fallback);
     });
-  } else {
-    face = document.createElement("span");
-    face.className = "fallback";
-    face.textContent = initial(name);
+    current?.replaceWith(face);
+    return;
   }
-  if (!framed) return face;
+  if (current?.classList.contains("fallback") && current.textContent === initial(spec.name)) return;
+  const fallback = document.createElement("span");
+  fallback.className = "fallback";
+  fallback.textContent = initial(spec.name);
+  current?.replaceWith(fallback);
+}
+
+function createRow(spec) {
+  const item = document.createElement("li");
+  item.dataset.key = spec.key;
+  item.className = spec.frame ? `medal-row place-${spec.place}` : `plain place-${spec.place}`;
+  const person = document.createElement("div");
+  person.className = "person";
+  const who = document.createElement("span");
+  who.className = "name";
+  const score = document.createElement("span");
+  score.className = "score";
+  const icon = document.createElement("img");
+  icon.alt = "";
+  icon.decoding = "async";
+  icon.src = spec.icon;
+  const value = document.createElement("span");
+  value.className = "score-value";
+  score.append(icon, value);
+  person.append(who, score);
+  fillPerson(person, spec);
+  if (!spec.frame) {
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = String(spec.place);
+    item.append(rank, person);
+    return item;
+  }
   const medal = document.createElement("div");
   medal.className = "medal";
-  medal.append(face);
   const frame = document.createElement("img");
   frame.className = "frame";
   frame.alt = "";
-  frame.src = framed;
-  medal.append(frame);
-  return medal;
+  frame.decoding = "async";
+  frame.src = spec.frame;
+  const face = document.createElement("span");
+  face.className = "fallback";
+  medal.append(face, frame);
+  setFace(medal, spec);
+  item.append(medal, person);
+  return item;
 }
 
-function waitingRow(text) {
+function paintMessage(text, pulse) {
+  const current = rows.firstElementChild;
+  if (rows.childElementCount === 1 && current?.dataset.message === text) return;
   const item = document.createElement("li");
   item.className = "waiting";
-  const pulse = document.createElement("span");
-  pulse.className = "pulse";
+  item.dataset.message = text;
+  if (pulse) {
+    const mark = document.createElement("span");
+    mark.className = "pulse";
+    item.append(mark);
+  }
   const label = document.createElement("span");
   label.textContent = text;
-  item.append(pulse, label);
-  return item;
+  item.append(label);
+  rows.replaceChildren(item);
+}
+
+function paintRows(list) {
+  const specs = list.map((row, index) => rowSpec(row, index + 1));
+  const current = [...rows.children];
+  const nodes = specs.map((spec) => {
+    const found = current.find((node) => node.dataset.key === spec.key);
+    if (!found) return createRow(spec);
+    found.className = spec.frame ? `medal-row place-${spec.place}` : `plain place-${spec.place}`;
+    const rank = found.querySelector(".rank");
+    if (rank) rank.textContent = String(spec.place);
+    fillPerson(found.querySelector(".person"), spec);
+    const medal = found.querySelector(".medal");
+    if (medal) setFace(medal, spec);
+    return found;
+  });
+  const same = nodes.length === current.length && nodes.every((node, index) => current[index] === node);
+  if (!same) rows.replaceChildren(...nodes);
 }
 
 function render(state) {
   lastState = state || lastState;
+  warmImages();
   applyTitle();
   if (missingKey) {
-    const item = document.createElement("li");
-    item.className = "waiting";
-    const label = document.createElement("span");
-    label.textContent = "Link sem a chave da conta.";
-    item.append(label);
-    rows.replaceChildren(item);
+    paintMessage("Link sem a chave da conta.", false);
     return;
   }
   const limit = topLimit();
   const source = mode === "gifts" ? lastState.topGifters : lastState.topLikers;
   const list = (source || []).slice(0, limit);
   if (!list.length) {
-    rows.replaceChildren(waitingRow("Aguardando alguém entrar no ranking"));
+    paintMessage("Aguardando alguém entrar no ranking", true);
     return;
   }
-
-  rows.replaceChildren(...list.map((row, index) => {
-    const place = index + 1;
-    const frame = place <= 3 ? frameUrl(String(place)) : "";
-    const item = document.createElement("li");
-    item.className = frame ? `medal-row place-${place}` : `plain place-${place}`;
-    const name = row.nickname || row.uniqueId;
-    const person = document.createElement("div");
-    person.className = "person";
-    const who = document.createElement("span");
-    who.className = "name";
-    who.style.color = nameColorFor(place);
-    who.textContent = name;
-    const score = document.createElement("span");
-    score.className = "score";
-    score.style.color = textColor(currentStyle().scoreColor, "#ffffff");
-    const icon = document.createElement("img");
-    icon.alt = "";
-    icon.src = mode === "gifts" ? "/assets/moeda.png" : "/assets/coracao.png";
-    const value = document.createElement("span");
-    const amount = mode === "gifts" ? row.diamonds : row.likes;
-    value.textContent = numberFormat.format(amount || 0);
-    score.append(icon, value);
-    person.append(who, score);
-    if (frame) {
-      item.append(portrait(name, row.avatar, frame), person);
-      return item;
-    }
-    const rank = document.createElement("span");
-    rank.className = "rank";
-    rank.textContent = String(place);
-    item.append(rank, person);
-    return item;
-  }));
+  paintRows(list);
 }
 
 function connectSocket() {

@@ -1,7 +1,8 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 import { WebSocketServer } from "ws";
 import {
   createSession,
@@ -103,6 +104,29 @@ function readBody(req) {
   });
 }
 
+const resizedAssets = new Map();
+
+async function resizedAsset(filePath, ext) {
+  if (![".png", ".jpg", ".jpeg", ".webp"].includes(ext)) return null;
+  if (!filePath.includes(`${path.sep}assets${path.sep}`)) return null;
+  const info = await stat(filePath);
+  const key = `${filePath}:${info.mtimeMs}`;
+  if (resizedAssets.has(key)) return resizedAssets.get(key);
+  const image = sharp(filePath, { failOn: "none" });
+  const meta = await image.metadata();
+  const largest = Math.max(meta.width || 0, meta.height || 0);
+  if (largest <= 256) {
+    resizedAssets.set(key, null);
+    return null;
+  }
+  const buffer = await image
+    .resize({ width: 256, height: 256, fit: "inside", withoutEnlargement: true })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  resizedAssets.set(key, buffer);
+  return buffer;
+}
+
 async function serveStatic(res, fileName) {
   const filePath = path.resolve(publicDir, fileName);
   const relative = path.relative(publicDir, filePath);
@@ -111,11 +135,18 @@ async function serveStatic(res, fileName) {
     return;
   }
   try {
-    const data = await readFile(filePath);
     const ext = path.extname(filePath);
+    let data = await readFile(filePath);
+    let type = TYPES[ext] || "application/octet-stream";
+    const smaller = await resizedAsset(filePath, ext).catch(() => null);
+    if (smaller) {
+      data = smaller;
+      type = "image/png";
+    }
+    const cacheable = Boolean(smaller) || /\.(png|jpe?g|webp|gif|svg|ico)$/i.test(ext);
     res.writeHead(200, {
-      "Content-Type": TYPES[ext] || "application/octet-stream",
-      "Cache-Control": "no-store",
+      "Content-Type": type,
+      "Cache-Control": cacheable ? "public, max-age=86400" : "no-store",
     });
     res.end(data);
   } catch {
