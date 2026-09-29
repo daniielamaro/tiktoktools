@@ -16,7 +16,7 @@ metadata:
   labels:
     app: tiktok-rankings
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: tiktok-rankings
@@ -81,7 +81,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   rules:
-    - host: defina-o-host
+    - host: tiktok-tools.danielamaro.com.br
       http:
         paths:
           - path: /
