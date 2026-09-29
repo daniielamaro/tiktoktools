@@ -36,8 +36,8 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: data-permissions
-          image: tiktok-tools:latest
-          imagePullPolicy: IfNotPresent
+          image: busybox:1.36
+          imagePullPolicy: Always
           command: ["sh", "-c", "chown -R 1000:1000 /app/data && chmod 775 /app/data"]
           securityContext:
             runAsUser: 0
@@ -46,8 +46,8 @@ spec:
               mountPath: /app/data
       containers:
         - name: tiktok-tools
-          image: tiktok-tools:latest
-          imagePullPolicy: IfNotPresent
+          image: daniielamaro/tiktok-tools:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8787

@@ -35,13 +35,11 @@ function clampTop(value) {
 }
 
 function overlayUrls() {
-  const port = location.port || "8787";
   const top = clampTop(topCount.value);
-  const base = `http://127.0.0.1:${port}`;
   const key = encodeURIComponent(overlayKey);
   return {
-    likes: `${base}/overlay/likes?key=${key}&top=${top}`,
-    gifts: `${base}/overlay/gifts?key=${key}&top=${top}`,
+    likes: `${location.origin}/overlay/likes?key=${key}&top=${top}`,
+    gifts: `${location.origin}/overlay/gifts?key=${key}&top=${top}`,
   };
 }
 
