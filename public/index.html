@@ -29,7 +29,7 @@
           <input id="unique-id" name="uniqueId" type="text" placeholder="seunome" autocomplete="off" spellcheck="false" />
           <button id="connect-btn" type="submit">Conectar</button>
           <button id="disconnect-btn" type="button" class="ghost" disabled>Desconectar</button>
-          <button id="reset-btn" type="button" class="ghost" disabled>Zerar ranking</button>
+          <button id="reset-btn" type="button" class="ghost" disabled>Zerar tudo</button>
           <button id="preview-btn" type="button" class="ghost">Teste por 15 segundos</button>
         </div>
       </form>
@@ -52,7 +52,10 @@
       <article class="panel" data-overlay="likes">
         <header>
           <h2>Top curtidas</h2>
-          <button type="button" class="copy" data-copy="likes">Copiar URL</button>
+          <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="likes" disabled>Zerar</button>
+            <button type="button" class="copy" data-copy="likes">Copiar URL</button>
+          </div>
         </header>
         <label class="top-label" for="top-count">Posições no overlay</label>
         <input id="top-count" type="number" min="1" max="20" value="5" />
@@ -84,7 +87,10 @@
       <article class="panel" data-overlay="gifts">
         <header>
           <h2>Top presentes</h2>
-          <button type="button" class="copy" data-copy="gifts">Copiar URL</button>
+          <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="gifts" disabled>Zerar</button>
+            <button type="button" class="copy" data-copy="gifts">Copiar URL</button>
+          </div>
         </header>
         <p class="hint">Ordem por diamantes gastos nesta conexão.</p>
         <code id="url-gifts"></code>
@@ -116,7 +122,10 @@
       <article class="panel goal-panel" data-overlay="goals">
         <header>
           <h2>Meta</h2>
-          <button type="button" class="copy" data-copy="goals">Copiar URL</button>
+          <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="goals" disabled>Zerar</button>
+            <button type="button" class="copy" data-copy="goals">Copiar URL</button>
+          </div>
         </header>
         <p class="hint">Barra de progresso com curtidas, diamantes ou espectadores desta conexão.</p>
         <code id="url-goals"></code>
@@ -179,7 +188,10 @@
         <article class="panel tool-card" data-overlay="alerts">
           <header>
             <h2>Alertas</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="alerts" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="alerts">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Presente, follow, share e entrada aparecem e somem sozinhos.</p>
           <code id="url-alerts"></code>
@@ -203,7 +215,10 @@
         <article class="panel tool-card" data-overlay="ticker">
           <header>
             <h2>Último presente</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="ticker" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="ticker">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Faixa com o presente mais recente.</p>
           <code id="url-ticker"></code>
@@ -221,7 +236,10 @@
         <article class="panel tool-card" data-overlay="recent">
           <header>
             <h2>Últimos gifters</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="recent" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="recent">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Os 5 últimos, em ordem cronológica.</p>
           <code id="url-recent"></code>
@@ -239,7 +257,10 @@
         <article class="panel tool-card" data-overlay="combo">
           <header>
             <h2>Combo de curtidas</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="combo" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="combo">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Quem está mashando like agora.</p>
           <code id="url-combo"></code>
@@ -263,7 +284,10 @@
         <article class="panel tool-card" data-overlay="stats">
           <header>
             <h2>Card da live</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="stats" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="stats">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Espectadores, pico, likes, diamantes, follows e tempo.</p>
           <code id="url-stats"></code>
@@ -281,7 +305,10 @@
         <article class="panel tool-card" data-overlay="countdown">
           <header>
             <h2>Contagem</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="countdown" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="countdown">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Relógio regressivo. Inicie pelo painel quando quiser.</p>
           <code id="url-countdown"></code>
@@ -311,7 +338,10 @@
         <article class="panel tool-card" data-overlay="chat">
           <header>
             <h2>Chat</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="chat" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="chat">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Últimos comentários da live.</p>
           <code id="url-chat"></code>
@@ -329,7 +359,10 @@
         <article class="panel tool-card" data-overlay="wheel">
           <header>
             <h2>Sorteio</h2>
+            <div class="header-actions">
+            <button type="button" class="ghost reset-one" data-reset="wheel" disabled>Zerar</button>
             <button type="button" class="copy" data-copy="wheel">Copiar URL</button>
+          </div>
           </header>
           <p class="hint">Sorteia entre quem mandou presente nesta sessão.</p>
           <code id="url-wheel"></code>
@@ -359,10 +392,11 @@
       <ul>
         <li>A conta precisa estar em live no momento da conexão.</li>
         <li>Ao conectar, o painel guarda o último status da live: espectadores, total de curtidas e o ranking de presentes que o TikTok já está mostrando. Isso permanece até você zerar.</li>
-        <li>Zerar ranking descarta esse status. Depois disso, curtidas e presentes contam só o que chegar em seguida.</li>
+        <li>Zerar tudo descarta o status da sessão. Depois disso, curtidas e presentes contam só o que chegar em seguida.</li>
+        <li>Zerar no card de um overlay limpa só aquele overlay. O alvo da meta e o visual continuam salvos.</li>
         <li>O ranking de quem mais curtiu não tem histórico por pessoa. Essa lista começa a preencher depois da conexão.</li>
         <li>A estimativa em dólar usa US$ 0,005 por diamante, a faixa comum do que o criador recebe. O valor pago de fato muda por país e pelo preço das moedas.</li>
-        <li>A meta usa os mesmos números da sessão. Zerar ranking também zera o progresso da barra; o alvo configurado permanece.</li>
+        <li>A meta usa os números da sessão a partir do último zerar da própria meta. Zerar tudo também zera o progresso da barra; o alvo configurado permanece.</li>
         <li>Alertas, chat, combo e sorteio usam eventos desta conexão. Cole cada URL como fonte Link no Live Studio.</li>
         <li>O histórico grava a live ao encerrar ou desconectar. Reiniciar o servidor não recupera o progresso da sessão atual.</li>
         <li>Os links do overlay são desta conta. Outra pessoa neste computador usa os links da própria conta.</li>

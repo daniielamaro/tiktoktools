@@ -284,7 +284,8 @@ async function handleRequest(req, res) {
 
     if (req.method === "POST" && pathname === "/api/reset") {
       const user = requireUser(req);
-      sendJson(res, 200, getLiveSession(user.id).reset());
+      const body = await readBody(req);
+      sendJson(res, 200, getLiveSession(user.id).reset(body.scope));
       return;
     }
 

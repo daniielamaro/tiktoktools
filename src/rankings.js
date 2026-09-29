@@ -30,6 +30,11 @@ export function createRankings() {
     recentJoins: [],
     spin: null,
     countdownEndsAt: 0,
+    diamondBank: 0,
+    goalBaseline: null,
+    statsBaseline: null,
+    statsPeak: 0,
+    alertsEpoch: 0,
   };
 }
 
@@ -93,6 +98,7 @@ export function setViewers(rankings, count) {
   if (!Number.isFinite(count) || count < 0) return false;
   rankings.viewers = count;
   if (count > rankings.peakViewers) rankings.peakViewers = count;
+  if (count > rankings.statsPeak) rankings.statsPeak = count;
   return true;
 }
 
@@ -280,6 +286,93 @@ export function socialKind(data) {
   return "";
 }
 
+function sumGifters(rankings) {
+  let sum = 0;
+  for (const row of rankings.gifters.values()) sum += row.diamonds;
+  return sum;
+}
+
+function captureBaseline(rankings) {
+  return {
+    likes: rankings.totalLikes,
+    diamonds: sumGifters(rankings) + (rankings.diamondBank || 0),
+    viewers: rankings.viewers,
+    follows: rankings.followCount,
+    shares: rankings.shareCount,
+    gifts: { ...rankings.giftCounts },
+  };
+}
+
+export const RESET_SCOPES = [
+  "likes",
+  "gifts",
+  "goals",
+  "alerts",
+  "ticker",
+  "recent",
+  "combo",
+  "stats",
+  "countdown",
+  "chat",
+  "wheel",
+];
+
+export function resetScope(rankings, scope) {
+  if (scope === "likes") {
+    rankings.likers = new Map();
+    return true;
+  }
+  if (scope === "gifts") {
+    rankings.diamondBank = (rankings.diamondBank || 0) + sumGifters(rankings);
+    rankings.gifters = new Map();
+    return true;
+  }
+  if (scope === "goals") {
+    rankings.goalBaseline = captureBaseline(rankings);
+    return true;
+  }
+  if (scope === "alerts") {
+    rankings.alertsEpoch = (rankings.alertsEpoch || 0) + 1;
+    return true;
+  }
+  if (scope === "ticker") {
+    rankings.lastGift = null;
+    return true;
+  }
+  if (scope === "recent") {
+    rankings.recentGifters = [];
+    return true;
+  }
+  if (scope === "combo") {
+    rankings.likeCombo = null;
+    return true;
+  }
+  if (scope === "stats") {
+    rankings.statsBaseline = {
+      likes: rankings.totalLikes,
+      diamonds: sumGifters(rankings) + (rankings.diamondBank || 0),
+      follows: rankings.followCount,
+      shares: rankings.shareCount,
+      startedAt: Date.now(),
+    };
+    rankings.statsPeak = rankings.viewers;
+    return true;
+  }
+  if (scope === "countdown") {
+    rankings.countdownEndsAt = 0;
+    return true;
+  }
+  if (scope === "chat") {
+    rankings.comments = [];
+    return true;
+  }
+  if (scope === "wheel") {
+    rankings.spin = null;
+    return true;
+  }
+  return false;
+}
+
 export function resetScores(rankings) {
   rankings.likers = new Map();
   rankings.gifters = new Map();
@@ -301,6 +394,11 @@ export function resetScores(rankings) {
   rankings.recentJoins = [];
   rankings.spin = null;
   rankings.peakViewers = rankings.viewers;
+  rankings.diamondBank = 0;
+  rankings.goalBaseline = null;
+  rankings.statsBaseline = null;
+  rankings.statsPeak = rankings.viewers;
+  rankings.alertsEpoch = (rankings.alertsEpoch || 0) + 1;
 }
 
 function trackedLikes(rankings) {
@@ -310,9 +408,7 @@ function trackedLikes(rankings) {
 }
 
 function totalDiamonds(rankings) {
-  let sum = 0;
-  for (const row of rankings.gifters.values()) sum += row.diamonds;
-  return sum;
+  return sumGifters(rankings) + (rankings.diamondBank || 0);
 }
 
 function topRows(map, scoreKey) {
@@ -352,5 +448,9 @@ export function snapshot(rankings) {
     recentJoins: rankings.recentJoins.map((row) => ({ ...row })),
     spin: rankings.spin ? { ...rankings.spin } : null,
     countdownEndsAt: rankings.countdownEndsAt || 0,
+    goalBaseline: rankings.goalBaseline ? { ...rankings.goalBaseline, gifts: { ...rankings.goalBaseline.gifts } } : null,
+    statsBaseline: rankings.statsBaseline ? { ...rankings.statsBaseline } : null,
+    statsPeak: rankings.statsPeak || 0,
+    alertsEpoch: rankings.alertsEpoch || 0,
   };
 }

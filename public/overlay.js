@@ -283,6 +283,20 @@ function metricValue(state, metric, giftName) {
   return Number(state?.totalLikes) || 0;
 }
 
+function goalProgress(state, metric, giftName) {
+  const raw = metricValue(state, metric, giftName);
+  const base = state?.goalBaseline;
+  if (!base) return raw;
+  if (metric === "gift") {
+    const key = String(giftName || "").trim().toLowerCase();
+    return Math.max(0, raw - (Number(base.gifts?.[key]) || 0));
+  }
+  const field = metric === "diamonds" || metric === "viewers" || metric === "follows" || metric === "shares"
+    ? metric
+    : "likes";
+  return Math.max(0, raw - (Number(base[field]) || 0));
+}
+
 function activeGoal(style, current) {
   const marks = String(style.milestones || "")
     .split(",")
@@ -343,7 +357,7 @@ function playGoalSound() {
 
 function paintGoal() {
   const style = currentStyle();
-  const current = metricValue(lastState, style.metric, style.giftName);
+  const current = goalProgress(lastState, style.metric, style.giftName);
   const active = activeGoal(style, current);
   goal.hidden = false;
   rows.hidden = true;
@@ -361,7 +375,7 @@ function paintGoal() {
   goalWasReached = reached;
   if (style.showSecond) {
     goalSecond.hidden = false;
-    const secondCurrent = metricValue(lastState, style.secondMetric, style.giftName);
+    const secondCurrent = goalProgress(lastState, style.secondMetric, style.giftName);
     const secondTarget = Math.max(1, Number(style.secondTarget) || 1000);
     goalSecondLabel.textContent = style.secondMetric === "diamonds" ? "Diamantes" : style.secondMetric === "likes" ? "Curtidas" : style.secondMetric;
     fillBar(goalTrack2, goalFill2, goalCounts2, goalPercent2, style, secondCurrent, secondTarget);
@@ -418,12 +432,27 @@ function paintTicker() {
   }
   const style = currentStyle();
   const line = document.createElement("div");
-  line.className = "ticker";
-  line.style.color = textColor(style.nameColor, "#ffffff");
-  const text = document.createElement("span");
-  text.className = "ticker-text";
-  text.textContent = `${gift.nickname} enviou ${gift.giftName}${gift.count > 1 ? ` x${gift.count}` : ""} · ${numberFormat.format(gift.diamonds)} diamantes`;
-  line.append(text);
+  line.className = "last-gift";
+  line.append(faceNode(gift.avatar, gift.nickname));
+  const copy = document.createElement("div");
+  copy.className = "alert-copy";
+  const name = document.createElement("span");
+  name.className = "name";
+  name.style.color = textColor(style.nameColor, "#ffffff");
+  name.textContent = gift.nickname;
+  const detail = document.createElement("span");
+  detail.className = "alert-detail";
+  const times = gift.count > 1 ? ` x${numberFormat.format(gift.count)}` : "";
+  detail.textContent = `enviou ${gift.giftName}${times} · ${numberFormat.format(gift.diamonds || 0)} diamantes`;
+  copy.append(name, detail);
+  line.append(copy);
+  if (gift.giftPicture) {
+    const pic = document.createElement("img");
+    pic.className = "gift-pic";
+    pic.alt = "";
+    pic.src = gift.giftPicture;
+    line.append(pic);
+  }
   showStage(line);
 }
 
@@ -484,13 +513,19 @@ function paintStats() {
   const style = currentStyle();
   const color = textColor(style.scoreColor, "#ffffff");
   const muted = textColor(style.nameColor, "#ffffff");
+  const base = lastState.statsBaseline;
+  const likes = Math.max(0, (Number(lastState.totalLikes) || 0) - (Number(base?.likes) || 0));
+  const diamonds = Math.max(0, (Number(lastState.totalDiamonds) || 0) - (Number(base?.diamonds) || 0));
+  const follows = Math.max(0, (Number(lastState.followCount) || 0) - (Number(base?.follows) || 0));
+  const peak = base ? (lastState.statsPeak || 0) : (lastState.peakViewers || 0);
+  const elapsed = base?.startedAt ? Date.now() - base.startedAt : lastState.durationMs;
   const items = [
     ["Espectadores", numberFormat.format(lastState.viewers || 0)],
-    ["Pico", numberFormat.format(lastState.peakViewers || 0)],
-    ["Curtidas", lastState.totalLikesKnown ? numberFormat.format(lastState.totalLikes || 0) : "—"],
-    ["Diamantes", numberFormat.format(lastState.totalDiamonds || 0)],
-    ["Follows", numberFormat.format(lastState.followCount || 0)],
-    ["Tempo", formatDuration(lastState.durationMs)],
+    ["Pico", numberFormat.format(peak)],
+    ["Curtidas", lastState.totalLikesKnown || base ? numberFormat.format(likes) : "—"],
+    ["Diamantes", numberFormat.format(diamonds)],
+    ["Follows", numberFormat.format(follows)],
+    ["Tempo", formatDuration(elapsed)],
   ];
   const allTime = lastState.allTime;
   if (allTime?.lives) {
@@ -657,8 +692,16 @@ function paintTool() {
   if (mode === "wheel") return paintWheel();
 }
 
+let seenAlerts = 0;
+
 function render(state) {
   lastState = state || lastState;
+  const epoch = Number(lastState.alertsEpoch) || 0;
+  if (epoch !== seenAlerts) {
+    seenAlerts = epoch;
+    alertQueue = [];
+    alertBusy = false;
+  }
   if (lastState.startedAt && !lastState.durationMs) {
     lastState = { ...lastState, durationMs: Date.now() - lastState.startedAt };
   }

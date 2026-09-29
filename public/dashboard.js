@@ -87,15 +87,23 @@ function colorValue(value, fallback = "#ffffff") {
 }
 
 function goalValue(next, metric, giftName) {
-  if (metric === "diamonds") return Number(next?.totalDiamonds) || 0;
-  if (metric === "viewers") return Number(next?.viewers) || 0;
-  if (metric === "follows") return Number(next?.followCount) || 0;
-  if (metric === "shares") return Number(next?.shareCount) || 0;
+  let raw = 0;
+  if (metric === "diamonds") raw = Number(next?.totalDiamonds) || 0;
+  else if (metric === "viewers") raw = Number(next?.viewers) || 0;
+  else if (metric === "follows") raw = Number(next?.followCount) || 0;
+  else if (metric === "shares") raw = Number(next?.shareCount) || 0;
+  else if (metric === "gift") {
+    const key = String(giftName || "").trim().toLowerCase();
+    raw = Number(next?.giftCounts?.[key]) || 0;
+  } else raw = Number(next?.totalLikes) || 0;
+  const base = next?.goalBaseline;
+  if (!base) return raw;
   if (metric === "gift") {
     const key = String(giftName || "").trim().toLowerCase();
-    return Number(next?.giftCounts?.[key]) || 0;
+    return Math.max(0, raw - (Number(base.gifts?.[key]) || 0));
   }
-  return Number(next?.totalLikes) || 0;
+  const field = metric === "diamonds" || metric === "viewers" || metric === "follows" || metric === "shares" ? metric : "likes";
+  return Math.max(0, raw - (Number(base[field]) || 0));
 }
 
 function goalStyleFromForm(form) {
@@ -186,7 +194,9 @@ function renderToolPreviews(next) {
   const combo = next?.likeCombo;
   const texts = {
     alerts: gift ? `${gift.nickname} · ${gift.giftName}` : "Nenhum alerta ainda",
-    ticker: gift ? `${gift.nickname} enviou ${gift.giftName}` : "Nenhum presente ainda",
+    ticker: gift
+      ? `${gift.nickname} enviou ${gift.giftName}${gift.count > 1 ? ` x${numberFormat.format(gift.count)}` : ""} · ${numberFormat.format(gift.diamonds || 0)} diamantes`
+      : "Nenhum presente ainda",
     recent: (next?.recentGifters || []).map((row) => row.nickname).join(", ") || "Ninguém ainda",
     combo: combo ? `${combo.nickname} x${combo.count}` : "Sem combo agora",
     stats: `${numberFormat.format(next?.viewers || 0)} assistindo · pico ${numberFormat.format(next?.peakViewers || 0)}`,
@@ -432,6 +442,9 @@ function render(next) {
   connectBtn.disabled = busy;
   disconnectBtn.disabled = next.status === "idle" || busy;
   resetBtn.disabled = next.status !== "live" && next.status !== "offline";
+  document.querySelectorAll(".reset-one").forEach((button) => {
+    button.disabled = resetBtn.disabled;
+  });
   renderPreview(previewLikes, next.topLikers || [], "likes", "curtidas");
   renderPreview(previewGifts, next.topGifters || [], "diamonds", "diamantes");
   if (goalForm) renderGoalPreview(next, goalStyleFromForm(goalForm));
@@ -473,10 +486,20 @@ disconnectBtn.addEventListener("click", async () => {
 
 resetBtn.addEventListener("click", async () => {
   try {
-    render(await post("/api/reset"));
+    render(await post("/api/reset", {}));
   } catch (err) {
     statusMessage.textContent = err.message;
   }
+});
+
+document.querySelectorAll(".reset-one").forEach((button) => {
+  button.addEventListener("click", async () => {
+    try {
+      render(await post("/api/reset", { scope: button.dataset.reset }));
+    } catch (err) {
+      statusMessage.textContent = err.message;
+    }
+  });
 });
 
 previewBtn.addEventListener("click", async () => {

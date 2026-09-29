@@ -220,6 +220,17 @@ button.ghost {
   gap: 12px;
 }
 
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-actions .ghost,
+.header-actions .copy {
+  height: 36px;
+}
+
 .urls h2, .limits h2 {
   margin: 0;
   font-size: 18px;

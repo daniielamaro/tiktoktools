@@ -17,6 +17,7 @@ import {
   createRankings,
   normalizeUniqueId,
   resetScores,
+  resetScope,
   setViewers,
   snapshot,
   socialKind,
@@ -75,8 +76,8 @@ function createSession(userId) {
     disconnect() {
       return disconnect(ctx);
     },
-    reset() {
-      return reset(ctx);
+    reset(scope) {
+      return reset(ctx, scope);
     },
     preview() {
       return startPreview(ctx);
@@ -373,14 +374,56 @@ async function disconnect(ctx) {
   return published(ctx);
 }
 
-function reset(ctx) {
+function reset(ctx, scope) {
   if (ctx.rankings.status !== "live" && ctx.rankings.status !== "connecting" && ctx.rankings.status !== "offline") {
     return published(ctx);
   }
-  clearPreview(ctx);
-  resetScores(ctx.rankings);
+  if (!scope) {
+    clearPreview(ctx);
+    resetScores(ctx.rankings);
+    emitNow(ctx);
+    return published(ctx);
+  }
+  if (!resetScope(ctx.rankings, scope)) {
+    const error = new Error("Overlay desconhecido.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (ctx.preview) resetPreview(ctx.preview, scope);
   emitNow(ctx);
   return published(ctx);
+}
+
+function resetPreview(preview, scope) {
+  if (scope === "likes") preview.topLikers = [];
+  if (scope === "gifts") preview.topGifters = [];
+  if (scope === "goals") {
+    preview.goalBaseline = {
+      likes: preview.totalLikes || 0,
+      diamonds: preview.totalDiamonds || 0,
+      viewers: preview.viewers || 0,
+      follows: preview.followCount || 0,
+      shares: preview.shareCount || 0,
+      gifts: { ...(preview.giftCounts || {}) },
+    };
+  }
+  if (scope === "alerts") preview.alertsEpoch = (preview.alertsEpoch || 0) + 1;
+  if (scope === "ticker") preview.lastGift = null;
+  if (scope === "recent") preview.recentGifters = [];
+  if (scope === "combo") preview.likeCombo = null;
+  if (scope === "stats") {
+    preview.statsBaseline = {
+      likes: preview.totalLikes || 0,
+      diamonds: preview.totalDiamonds || 0,
+      follows: preview.followCount || 0,
+      shares: preview.shareCount || 0,
+      startedAt: Date.now(),
+    };
+    preview.statsPeak = preview.viewers || 0;
+  }
+  if (scope === "countdown") preview.countdownEndsAt = 0;
+  if (scope === "chat") preview.comments = [];
+  if (scope === "wheel") preview.spin = null;
 }
 
 const PREVIEW_MS = 15_000;
