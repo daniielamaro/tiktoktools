@@ -39,9 +39,11 @@
       </div>
       <dl class="stats">
         <div><dt>Espectadores</dt><dd id="stat-viewers">0</dd></div>
+        <div><dt>Pico</dt><dd id="stat-peak">0</dd></div>
         <div><dt>Curtidas da live</dt><dd id="stat-likes">0</dd></div>
         <div><dt>Curtidas no ranking</dt><dd id="stat-tracked">0</dd></div>
         <div><dt>Diamantes</dt><dd id="stat-diamonds">0</dd></div>
+        <div><dt>Follows</dt><dd id="stat-follows">0</dd></div>
         <div><dt>Estimativa</dt><dd id="stat-usd">US$ 0,00</dd></div>
       </dl>
     </section>
@@ -130,9 +132,26 @@
             <option value="likes">Curtidas da live</option>
             <option value="diamonds">Diamantes</option>
             <option value="viewers">Espectadores</option>
+            <option value="follows">Follows</option>
+            <option value="shares">Compartilhamentos</option>
+            <option value="gift">Presente específico</option>
           </select>
+          <label class="top-label" for="goal-gift">Nome do presente</label>
+          <input id="goal-gift" name="giftName" type="text" maxlength="40" placeholder="Rosa" />
           <label class="top-label" for="goal-target">Alvo</label>
           <input id="goal-target" name="target" type="number" min="1" max="1000000000" value="10000" />
+          <label class="top-label" for="goal-milestones">Marcos (cascata)</label>
+          <input id="goal-milestones" name="milestones" type="text" maxlength="80" placeholder="1000, 5000, 10000" />
+          <label class="show-title"><input name="showSecond" type="checkbox" /> Segunda meta</label>
+          <label class="top-label" for="goal-second-metric">Segunda métrica</label>
+          <select id="goal-second-metric" name="secondMetric">
+            <option value="diamonds">Diamantes</option>
+            <option value="likes">Curtidas da live</option>
+            <option value="viewers">Espectadores</option>
+            <option value="follows">Follows</option>
+          </select>
+          <label class="top-label" for="goal-second-target">Segundo alvo</label>
+          <input id="goal-second-target" name="secondTarget" type="number" min="1" max="1000000000" value="1000" />
           <div class="color-grid">
             <label class="color-field">Barra <input name="barColor" type="color" value="#ffd166" aria-label="Cor da barra da meta" /></label>
             <label class="color-field">Fundo <input name="barTrackColor" type="color" value="#2a3140" aria-label="Cor do fundo da barra" /></label>
@@ -140,6 +159,7 @@
           </div>
           <label class="show-title"><input name="showCounts" type="checkbox" checked /> Mostrar atual / alvo</label>
           <label class="show-title"><input name="showPercent" type="checkbox" checked /> Mostrar porcentagem</label>
+          <label class="show-title"><input name="sound" type="checkbox" /> Som ao bater a meta</label>
           <button type="submit">Salvar visual</button>
           <p class="style-note"></p>
         </form>
@@ -153,6 +173,187 @@
       </article>
     </section>
 
+    <section class="tools">
+      <h2>Alertas e eventos</h2>
+      <div class="urls">
+        <article class="panel tool-card" data-overlay="alerts">
+          <header>
+            <h2>Alertas</h2>
+            <button type="button" class="copy" data-copy="alerts">Copiar URL</button>
+          </header>
+          <p class="hint">Presente, follow, share e entrada aparecem e somem sozinhos.</p>
+          <code id="url-alerts"></code>
+          <form class="style-form tool-form" data-mode="alerts">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Alertas" />
+              <input name="titleColor" type="color" value="#ffd166" aria-label="Cor do título de alertas" />
+            </div>
+            <label class="top-label">Segundos na tela</label>
+            <input name="duration" type="number" min="2" max="20" value="5" />
+            <label class="show-title"><input name="gifts" type="checkbox" checked /> Presentes</label>
+            <label class="show-title"><input name="follows" type="checkbox" checked /> Follows</label>
+            <label class="show-title"><input name="shares" type="checkbox" checked /> Shares</label>
+            <label class="show-title"><input name="joins" type="checkbox" /> Entrou na live</label>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="alerts"></p>
+        </article>
+        <article class="panel tool-card" data-overlay="ticker">
+          <header>
+            <h2>Último presente</h2>
+            <button type="button" class="copy" data-copy="ticker">Copiar URL</button>
+          </header>
+          <p class="hint">Faixa com o presente mais recente.</p>
+          <code id="url-ticker"></code>
+          <form class="style-form tool-form" data-mode="ticker">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Último presente" />
+              <input name="titleColor" type="color" value="#7ef6ec" aria-label="Cor do título do ticker" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="ticker"></p>
+        </article>
+        <article class="panel tool-card" data-overlay="recent">
+          <header>
+            <h2>Últimos gifters</h2>
+            <button type="button" class="copy" data-copy="recent">Copiar URL</button>
+          </header>
+          <p class="hint">Os 5 últimos, em ordem cronológica.</p>
+          <code id="url-recent"></code>
+          <form class="style-form tool-form" data-mode="recent">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Últimos presentes" />
+              <input name="titleColor" type="color" value="#7ef6ec" aria-label="Cor do título dos últimos gifters" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="recent"></p>
+        </article>
+        <article class="panel tool-card" data-overlay="combo">
+          <header>
+            <h2>Combo de curtidas</h2>
+            <button type="button" class="copy" data-copy="combo">Copiar URL</button>
+          </header>
+          <p class="hint">Quem está mashando like agora.</p>
+          <code id="url-combo"></code>
+          <form class="style-form tool-form" data-mode="combo">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Combo de curtidas" />
+              <input name="titleColor" type="color" value="#ff7a90" aria-label="Cor do título do combo" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="combo"></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="tools">
+      <h2>Presença</h2>
+      <div class="urls">
+        <article class="panel tool-card" data-overlay="stats">
+          <header>
+            <h2>Card da live</h2>
+            <button type="button" class="copy" data-copy="stats">Copiar URL</button>
+          </header>
+          <p class="hint">Espectadores, pico, likes, diamantes, follows e tempo.</p>
+          <code id="url-stats"></code>
+          <form class="style-form tool-form" data-mode="stats">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Live agora" />
+              <input name="titleColor" type="color" value="#ffffff" aria-label="Cor do título do card" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="stats"></p>
+        </article>
+        <article class="panel tool-card" data-overlay="countdown">
+          <header>
+            <h2>Contagem</h2>
+            <button type="button" class="copy" data-copy="countdown">Copiar URL</button>
+          </header>
+          <p class="hint">Relógio regressivo. Inicie pelo painel quando quiser.</p>
+          <code id="url-countdown"></code>
+          <form class="style-form tool-form" data-mode="countdown">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Contagem" />
+              <input name="titleColor" type="color" value="#f5c16c" aria-label="Cor do título da contagem" />
+            </div>
+            <label class="top-label">Minutos</label>
+            <input name="minutes" type="number" min="1" max="180" value="20" />
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <div class="connect-row">
+            <button type="button" id="countdown-btn">Iniciar contagem</button>
+            <button type="button" id="countdown-stop" class="ghost">Parar</button>
+          </div>
+          <p class="tool-preview" data-preview="countdown"></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="tools">
+      <h2>Interação</h2>
+      <div class="urls">
+        <article class="panel tool-card" data-overlay="chat">
+          <header>
+            <h2>Chat</h2>
+            <button type="button" class="copy" data-copy="chat">Copiar URL</button>
+          </header>
+          <p class="hint">Últimos comentários da live.</p>
+          <code id="url-chat"></code>
+          <form class="style-form tool-form" data-mode="chat">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Chat" />
+              <input name="titleColor" type="color" value="#ffffff" aria-label="Cor do título do chat" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <p class="tool-preview" data-preview="chat"></p>
+        </article>
+        <article class="panel tool-card" data-overlay="wheel">
+          <header>
+            <h2>Sorteio</h2>
+            <button type="button" class="copy" data-copy="wheel">Copiar URL</button>
+          </header>
+          <p class="hint">Sorteia entre quem mandou presente nesta sessão.</p>
+          <code id="url-wheel"></code>
+          <form class="style-form tool-form" data-mode="wheel">
+            <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+            <div class="style-row">
+              <input name="title" type="text" maxlength="40" value="Sorteio" />
+              <input name="titleColor" type="color" value="#ffd166" aria-label="Cor do título do sorteio" />
+            </div>
+            <button type="submit">Salvar visual</button>
+            <p class="style-note"></p>
+          </form>
+          <button type="button" id="spin-btn">Sortear</button>
+          <p class="tool-preview" data-preview="wheel"></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel history-panel">
+      <h2>Histórico de lives</h2>
+      <p class="hint">Totais gravados ao encerrar ou desconectar. O overlay de card também mostra o acumulado.</p>
+      <ol id="history-list" class="preview"></ol>
+    </section>
+
     <section class="panel limits">
       <h2>Limites</h2>
       <ul>
@@ -162,6 +363,8 @@
         <li>O ranking de quem mais curtiu não tem histórico por pessoa. Essa lista começa a preencher depois da conexão.</li>
         <li>A estimativa em dólar usa US$ 0,005 por diamante, a faixa comum do que o criador recebe. O valor pago de fato muda por país e pelo preço das moedas.</li>
         <li>A meta usa os mesmos números da sessão. Zerar ranking também zera o progresso da barra; o alvo configurado permanece.</li>
+        <li>Alertas, chat, combo e sorteio usam eventos desta conexão. Cole cada URL como fonte Link no Live Studio.</li>
+        <li>O histórico grava a live ao encerrar ou desconectar. Reiniciar o servidor não recupera o progresso da sessão atual.</li>
         <li>Os links do overlay são desta conta. Outra pessoa neste computador usa os links da própria conta.</li>
       </ul>
     </section>

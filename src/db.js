@@ -38,3 +38,22 @@ if (!userColumns.has("overlay_gifts")) {
 if (!userColumns.has("overlay_goals")) {
   db.exec("ALTER TABLE users ADD COLUMN overlay_goals TEXT NOT NULL DEFAULT ''");
 }
+if (!userColumns.has("overlay_tools")) {
+  db.exec("ALTER TABLE users ADD COLUMN overlay_tools TEXT NOT NULL DEFAULT ''");
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS live_history (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    unique_id TEXT NOT NULL DEFAULT '',
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER NOT NULL,
+    peak_viewers INTEGER NOT NULL DEFAULT 0,
+    total_likes INTEGER NOT NULL DEFAULT 0,
+    total_diamonds INTEGER NOT NULL DEFAULT 0,
+    follow_count INTEGER NOT NULL DEFAULT 0,
+    share_count INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);

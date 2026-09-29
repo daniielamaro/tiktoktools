@@ -14,6 +14,7 @@ import {
   userFromSession,
 } from "./auth.js";
 import { dropLiveSession, getLiveSession } from "./live.js";
+import { listHistory } from "./history.js";
 import { listFrames, readStyles, saveStyle } from "./overlay-style.js";
 
 const PORT = 8787;
@@ -25,9 +26,6 @@ const STATIC = {
   "/": "index.html",
   "/login": "login.html",
   "/register": "register.html",
-  "/overlay/likes": "overlay.html",
-  "/overlay/gifts": "overlay.html",
-  "/overlay/goals": "overlay.html",
 };
 
 const TYPES = {
@@ -290,6 +288,24 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (req.method === "POST" && pathname === "/api/spin") {
+      const user = requireUser(req);
+      sendJson(res, 200, getLiveSession(user.id).spin());
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/countdown") {
+      const user = requireUser(req);
+      const body = await readBody(req);
+      sendJson(res, 200, getLiveSession(user.id).countdown(body.minutes, body.stop));
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/history") {
+      sendJson(res, 200, listHistory(requireUser(req).id));
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/") {
       if (!currentUser(req)) {
         redirect(res, "/login");
@@ -305,6 +321,11 @@ async function handleRequest(req, res) {
         return;
       }
       await serveStatic(res, STATIC[pathname]);
+      return;
+    }
+
+    if (req.method === "GET" && /^\/overlay\/[a-z]+$/.test(pathname)) {
+      await serveStatic(res, "overlay.html");
       return;
     }
 
@@ -351,7 +372,13 @@ wss.on("connection", (socket, req) => {
   }
   send(live.getState());
   const unsubscribe = live.subscribe(send);
-  socket.on("close", unsubscribe);
+  const unsubscribeEvents = live.subscribeEvents((event) => {
+    if (socket.readyState === 1) socket.send(JSON.stringify({ type: "event", event }));
+  });
+  socket.on("close", () => {
+    unsubscribe();
+    unsubscribeEvents();
+  });
 });
 
 server.listen(PORT, HOST, () => {

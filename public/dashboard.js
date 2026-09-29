@@ -20,7 +20,11 @@ const GOAL_TITLES = {
   likes: "Meta de curtidas",
   diamonds: "Meta de diamantes",
   viewers: "Meta de espectadores",
+  follows: "Meta de follows",
+  shares: "Meta de shares",
+  gift: "Meta do presente",
 };
+const TOOL_MODES = ["alerts", "ticker", "recent", "combo", "stats", "countdown", "chat", "wheel"];
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 const usdFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
@@ -49,6 +53,14 @@ function overlayUrls() {
     likes: `${location.origin}/overlay/likes?key=${key}&top=${top}`,
     gifts: `${location.origin}/overlay/gifts?key=${key}&top=${top}`,
     goals: `${location.origin}/overlay/goals?key=${key}`,
+    alerts: `${location.origin}/overlay/alerts?key=${key}`,
+    ticker: `${location.origin}/overlay/ticker?key=${key}`,
+    recent: `${location.origin}/overlay/recent?key=${key}`,
+    combo: `${location.origin}/overlay/combo?key=${key}`,
+    stats: `${location.origin}/overlay/stats?key=${key}`,
+    countdown: `${location.origin}/overlay/countdown?key=${key}`,
+    chat: `${location.origin}/overlay/chat?key=${key}`,
+    wheel: `${location.origin}/overlay/wheel?key=${key}`,
   };
 }
 
@@ -57,6 +69,10 @@ function renderUrls() {
   urlLikes.textContent = urls.likes;
   urlGifts.textContent = urls.gifts;
   urlGoals.textContent = urls.goals;
+  for (const mode of TOOL_MODES) {
+    const node = document.querySelector(`#url-${mode}`);
+    if (node) node.textContent = urls[mode];
+  }
 }
 
 const PLACE_LABEL = { 1: "1º lugar", 2: "2º lugar", 3: "3º lugar" };
@@ -70,9 +86,15 @@ function colorValue(value, fallback = "#ffffff") {
   return /^#[0-9a-fA-F]{6}$/.test(value || "") ? value : fallback;
 }
 
-function goalValue(next, metric) {
+function goalValue(next, metric, giftName) {
   if (metric === "diamonds") return Number(next?.totalDiamonds) || 0;
   if (metric === "viewers") return Number(next?.viewers) || 0;
+  if (metric === "follows") return Number(next?.followCount) || 0;
+  if (metric === "shares") return Number(next?.shareCount) || 0;
+  if (metric === "gift") {
+    const key = String(giftName || "").trim().toLowerCase();
+    return Number(next?.giftCounts?.[key]) || 0;
+  }
   return Number(next?.totalLikes) || 0;
 }
 
@@ -88,6 +110,12 @@ function goalStyleFromForm(form) {
     scoreColor: form.scoreColor.value,
     showCounts: form.showCounts.checked,
     showPercent: form.showPercent.checked,
+    milestones: form.milestones?.value || "",
+    showSecond: Boolean(form.showSecond?.checked),
+    secondMetric: form.secondMetric?.value || "diamonds",
+    secondTarget: Number.parseInt(form.secondTarget?.value, 10) || 1000,
+    sound: Boolean(form.sound?.checked),
+    giftName: form.giftName?.value || "",
   };
 }
 
@@ -102,6 +130,12 @@ function fillGoalForm(form, style) {
   form.scoreColor.value = colorValue(style.scoreColor);
   form.showCounts.checked = Boolean(style.showCounts);
   form.showPercent.checked = Boolean(style.showPercent);
+  if (form.giftName) form.giftName.value = style.giftName || "";
+  if (form.milestones) form.milestones.value = style.milestones || "";
+  if (form.showSecond) form.showSecond.checked = Boolean(style.showSecond);
+  if (form.secondMetric) form.secondMetric.value = style.secondMetric || "diamonds";
+  if (form.secondTarget) form.secondTarget.value = String(style.secondTarget || 1000);
+  if (form.sound) form.sound.checked = Boolean(style.sound);
 }
 
 function renderGoalPreview(next, style) {
@@ -111,7 +145,7 @@ function renderGoalPreview(next, style) {
   const counts = previewGoals.querySelector(".goal-counts");
   const percentLabel = previewGoals.querySelector(".goal-percent");
   const target = Math.max(1, Number(style.target) || 10000);
-  const current = goalValue(next, style.metric);
+  const current = goalValue(next, style.metric, style.giftName);
   const ratio = Math.min(1, current / target);
   const percent = Math.round(ratio * 100);
   previewGoals.classList.toggle("reached", ratio >= 1);
@@ -124,6 +158,78 @@ function renderGoalPreview(next, style) {
   counts.style.color = colorValue(style.scoreColor);
   percentLabel.textContent = style.showPercent ? `${percent}%` : "";
   percentLabel.style.color = colorValue(style.scoreColor);
+}
+
+function fillToolForm(form, style) {
+  if (!style) return;
+  for (const field of form.elements) {
+    if (!field.name) continue;
+    const value = style[field.name];
+    if (field.type === "checkbox") field.checked = Boolean(value);
+    else if (value != null) field.value = String(value);
+  }
+}
+
+function toolStyleFromForm(form) {
+  const body = { mode: form.dataset.mode };
+  for (const field of form.elements) {
+    if (!field.name || field.type === "submit") continue;
+    if (field.type === "checkbox") body[field.name] = field.checked;
+    else if (field.type === "number") body[field.name] = Number.parseInt(field.value, 10);
+    else body[field.name] = field.value;
+  }
+  return body;
+}
+
+function renderToolPreviews(next) {
+  const gift = next?.lastGift;
+  const combo = next?.likeCombo;
+  const texts = {
+    alerts: gift ? `${gift.nickname} · ${gift.giftName}` : "Nenhum alerta ainda",
+    ticker: gift ? `${gift.nickname} enviou ${gift.giftName}` : "Nenhum presente ainda",
+    recent: (next?.recentGifters || []).map((row) => row.nickname).join(", ") || "Ninguém ainda",
+    combo: combo ? `${combo.nickname} x${combo.count}` : "Sem combo agora",
+    stats: `${numberFormat.format(next?.viewers || 0)} assistindo · pico ${numberFormat.format(next?.peakViewers || 0)}`,
+    countdown: next?.countdownEndsAt ? "Contagem em andamento" : "Contagem parada",
+    chat: (next?.comments || [])[0]?.comment || "Nenhum comentário ainda",
+    wheel: next?.spin?.nickname ? `Último: ${next.spin.nickname}` : "Ainda não sorteou",
+  };
+  for (const [mode, text] of Object.entries(texts)) {
+    const node = document.querySelector(`[data-preview="${mode}"]`);
+    if (node) node.textContent = text;
+  }
+}
+
+function renderHistory(rows) {
+  const list = document.querySelector("#history-list");
+  if (!list) return;
+  if (!rows?.length) {
+    list.innerHTML = '<li class="empty">Nenhuma live gravada ainda</li>';
+    return;
+  }
+  list.replaceChildren(...rows.map((row) => {
+    const item = document.createElement("li");
+    const when = new Date(Number(row.endedAt) || Date.now());
+    const who = document.createElement("span");
+    who.className = "who";
+    who.textContent = `@${row.uniqueId} · ${when.toLocaleString("pt-BR")}`;
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = `${numberFormat.format(row.totalLikes || 0)} likes · ${numberFormat.format(row.totalDiamonds || 0)} ♦ · pico ${numberFormat.format(row.peakViewers || 0)}`;
+    const rank = document.createElement("span");
+    rank.textContent = "";
+    item.append(rank, who, score);
+    return item;
+  }));
+}
+
+async function loadHistory() {
+  try {
+    const response = await fetch("/api/history");
+    if (response.ok) renderHistory(await response.json());
+  } catch {
+    // O histórico é extra; o painel segue sem ele.
+  }
 }
 
 function fillForm(form, catalog, style) {
@@ -171,6 +277,30 @@ function fillForm(form, catalog, style) {
 
 function bindStyleForms(payload) {
   document.querySelectorAll(".style-form").forEach((form) => {
+    if (form.classList.contains("tool-form")) {
+      fillToolForm(form, payload[form.dataset.mode] || {});
+      if (form.dataset.bound) return;
+      form.dataset.bound = "1";
+      const note = form.querySelector(".style-note");
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = form.querySelector("button[type='submit']");
+        button.disabled = true;
+        note.textContent = "";
+        try {
+          const saved = await post("/api/overlay-style", toolStyleFromForm(form));
+          fillToolForm(form, saved[form.dataset.mode] || {});
+          note.className = "style-note";
+          note.textContent = "Visual salvo.";
+        } catch (err) {
+          note.className = "style-note error";
+          note.textContent = err.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+      return;
+    }
     if (form.dataset.mode === "goals") {
       fillGoalForm(form, payload.goals || {});
       renderGoalPreview(state || { totalLikes: 0, totalDiamonds: 0, viewers: 0 }, goalStyleFromForm(form));
@@ -290,11 +420,13 @@ function render(next) {
   statusPill.textContent = STATUS_LABEL[next.status] || STATUS_LABEL.idle;
   statusMessage.textContent = next.message || (next.uniqueId ? `@${next.uniqueId}` : "");
   document.querySelector("#stat-viewers").textContent = numberFormat.format(next.viewers || 0);
+  document.querySelector("#stat-peak").textContent = numberFormat.format(next.peakViewers || 0);
   document.querySelector("#stat-likes").textContent = next.totalLikesKnown
     ? numberFormat.format(next.totalLikes || 0)
     : "—";
   document.querySelector("#stat-tracked").textContent = numberFormat.format(next.trackedLikes || 0);
   document.querySelector("#stat-diamonds").textContent = numberFormat.format(next.totalDiamonds || 0);
+  document.querySelector("#stat-follows").textContent = numberFormat.format(next.followCount || 0);
   document.querySelector("#stat-usd").textContent = usdFormat.format((next.totalDiamonds || 0) * DIAMOND_TO_USD);
   const busy = next.status === "connecting";
   connectBtn.disabled = busy;
@@ -303,6 +435,7 @@ function render(next) {
   renderPreview(previewLikes, next.topLikers || [], "likes", "curtidas");
   renderPreview(previewGifts, next.topGifters || [], "diamonds", "diamantes");
   if (goalForm) renderGoalPreview(next, goalStyleFromForm(goalForm));
+  renderToolPreviews(next);
 }
 
 async function post(path, body) {
@@ -332,6 +465,7 @@ form.addEventListener("submit", async (event) => {
 disconnectBtn.addEventListener("click", async () => {
   try {
     render(await post("/api/disconnect"));
+    await loadHistory();
   } catch (err) {
     statusMessage.textContent = err.message;
   }
@@ -366,6 +500,31 @@ previewBtn.addEventListener("click", async () => {
     clearInterval(timer);
     previewBtn.disabled = false;
     previewBtn.textContent = label;
+    statusMessage.textContent = err.message;
+  }
+});
+
+document.querySelector("#countdown-btn")?.addEventListener("click", async () => {
+  const minutes = document.querySelector(".tool-form[data-mode='countdown'] [name='minutes']")?.value;
+  try {
+    render(await post("/api/countdown", { minutes }));
+  } catch (err) {
+    statusMessage.textContent = err.message;
+  }
+});
+
+document.querySelector("#countdown-stop")?.addEventListener("click", async () => {
+  try {
+    render(await post("/api/countdown", { stop: true }));
+  } catch (err) {
+    statusMessage.textContent = err.message;
+  }
+});
+
+document.querySelector("#spin-btn")?.addEventListener("click", async () => {
+  try {
+    render(await post("/api/spin"));
+  } catch (err) {
     statusMessage.textContent = err.message;
   }
 });
@@ -427,6 +586,7 @@ async function boot() {
   if (styleResponse.ok) bindStyleForms(await styleResponse.json());
   const stateResponse = await fetch("/api/state");
   if (stateResponse.ok) render(await stateResponse.json());
+  await loadHistory();
   connectSocket();
 }
 

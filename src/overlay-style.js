@@ -16,7 +16,7 @@ const DEFAULTS = {
   gifts: { showTitle: true, title: "Top presentes", titleColor: "#7ef6ec" },
 };
 const TEXT_COLOR = "#ffffff";
-const GOAL_METRICS = new Set(["likes", "diamonds", "viewers"]);
+const GOAL_METRICS = new Set(["likes", "diamonds", "viewers", "follows", "shares", "gift"]);
 const GOAL_DEFAULTS = {
   showTitle: true,
   title: "Meta de curtidas",
@@ -28,6 +28,33 @@ const GOAL_DEFAULTS = {
   scoreColor: TEXT_COLOR,
   showPercent: true,
   showCounts: true,
+  milestones: "",
+  showSecond: false,
+  secondMetric: "diamonds",
+  secondTarget: 1000,
+  sound: false,
+  giftName: "",
+};
+export const TOOL_MODES = ["alerts", "ticker", "recent", "combo", "stats", "countdown", "chat", "wheel"];
+const TOOL_DEFAULTS = {
+  alerts: {
+    showTitle: true,
+    title: "Alertas",
+    titleColor: "#ffd166",
+    nameColor: TEXT_COLOR,
+    duration: 5,
+    gifts: true,
+    follows: true,
+    shares: true,
+    joins: false,
+  },
+  ticker: { showTitle: true, title: "Último presente", titleColor: "#7ef6ec", nameColor: TEXT_COLOR },
+  recent: { showTitle: true, title: "Últimos presentes", titleColor: "#7ef6ec", nameColor: TEXT_COLOR, scoreColor: TEXT_COLOR },
+  combo: { showTitle: true, title: "Combo de curtidas", titleColor: "#ff7a90", nameColor: TEXT_COLOR, scoreColor: TEXT_COLOR },
+  stats: { showTitle: true, title: "Live agora", titleColor: TEXT_COLOR, nameColor: TEXT_COLOR, scoreColor: TEXT_COLOR },
+  countdown: { showTitle: true, title: "Contagem", titleColor: "#f5c16c", scoreColor: TEXT_COLOR, minutes: 20 },
+  chat: { showTitle: true, title: "Chat", titleColor: TEXT_COLOR, nameColor: TEXT_COLOR },
+  wheel: { showTitle: true, title: "Sorteio", titleColor: "#ffd166", nameColor: TEXT_COLOR },
 };
 
 function hexColor(value, fallback) {
@@ -48,6 +75,25 @@ function defaultGoalStyle() {
   return { ...GOAL_DEFAULTS };
 }
 
+function intIn(value, min, max, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function milestonesText(value) {
+  const parts = String(value || "")
+    .split(/[,;]+/)
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .slice(0, 8);
+  return parts.join(", ");
+}
+
+function flag(value, fallback) {
+  return value == null ? fallback : Boolean(value);
+}
+
 function parseGoalStored(raw) {
   const fallback = defaultGoalStyle();
   if (!raw) return fallback;
@@ -64,6 +110,12 @@ function parseGoalStored(raw) {
       scoreColor: hexColor(data.scoreColor, fallback.scoreColor),
       showPercent: Boolean(data.showPercent),
       showCounts: Boolean(data.showCounts),
+      milestones: milestonesText(data.milestones),
+      showSecond: Boolean(data.showSecond),
+      secondMetric: goalMetric(data.secondMetric || fallback.secondMetric),
+      secondTarget: goalTarget(data.secondTarget || fallback.secondTarget),
+      sound: Boolean(data.sound),
+      giftName: String(data.giftName || "").trim().slice(0, 40),
     };
   } catch {
     return fallback;
@@ -83,7 +135,52 @@ function buildGoalStyle(body) {
     scoreColor: hexColor(body?.scoreColor, fallback.scoreColor),
     showPercent: Boolean(body?.showPercent),
     showCounts: Boolean(body?.showCounts),
+    milestones: milestonesText(body?.milestones),
+    showSecond: Boolean(body?.showSecond),
+    secondMetric: goalMetric(body?.secondMetric || fallback.secondMetric),
+    secondTarget: goalTarget(body?.secondTarget || fallback.secondTarget),
+    sound: Boolean(body?.sound),
+    giftName: String(body?.giftName || "").trim().slice(0, 40),
   };
+}
+
+function parseTool(mode, data) {
+  const fallback = { ...TOOL_DEFAULTS[mode] };
+  if (!data || typeof data !== "object") return fallback;
+  const style = {
+    showTitle: Boolean(data.showTitle),
+    title: String(data.title || "").trim().slice(0, 40),
+    titleColor: hexColor(data.titleColor, fallback.titleColor),
+    nameColor: hexColor(data.nameColor, fallback.nameColor || TEXT_COLOR),
+  };
+  if (fallback.scoreColor) style.scoreColor = hexColor(data.scoreColor, fallback.scoreColor);
+  if (mode === "alerts") {
+    style.duration = intIn(data.duration, 2, 20, fallback.duration);
+    style.gifts = flag(data.gifts, fallback.gifts);
+    style.follows = flag(data.follows, fallback.follows);
+    style.shares = flag(data.shares, fallback.shares);
+    style.joins = flag(data.joins, fallback.joins);
+  }
+  if (mode === "countdown") style.minutes = intIn(data.minutes, 1, 180, fallback.minutes);
+  return style;
+}
+
+function buildTool(mode, body) {
+  return parseTool(mode, body);
+}
+
+function readTools(raw) {
+  let data = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw) || {};
+    } catch {
+      data = {};
+    }
+  }
+  const tools = {};
+  for (const mode of TOOL_MODES) tools[mode] = parseTool(mode, data[mode]);
+  return tools;
 }
 
 export function listFrames() {
@@ -157,18 +254,26 @@ function parseStored(raw, mode, catalog) {
 
 export function readStyles(userId) {
   const catalog = listFrames();
-  const row = db.prepare("SELECT overlay_likes, overlay_gifts, overlay_goals FROM users WHERE id = ?").get(userId);
+  const row = db.prepare("SELECT overlay_likes, overlay_gifts, overlay_goals, overlay_tools FROM users WHERE id = ?").get(userId);
   return {
     catalog,
     likes: parseStored(row?.overlay_likes, "likes", catalog),
     gifts: parseStored(row?.overlay_gifts, "gifts", catalog),
     goals: parseGoalStored(row?.overlay_goals),
+    ...readTools(row?.overlay_tools),
   };
 }
 
 export function saveStyle(userId, mode, body) {
   if (mode === "goals") {
     db.prepare("UPDATE users SET overlay_goals = ? WHERE id = ?").run(JSON.stringify(buildGoalStyle(body)), userId);
+    return readStyles(userId);
+  }
+  if (TOOL_MODES.includes(mode)) {
+    const row = db.prepare("SELECT overlay_tools FROM users WHERE id = ?").get(userId);
+    const tools = readTools(row?.overlay_tools);
+    tools[mode] = buildTool(mode, body);
+    db.prepare("UPDATE users SET overlay_tools = ? WHERE id = ?").run(JSON.stringify(tools), userId);
     return readStyles(userId);
   }
   if (mode !== "likes" && mode !== "gifts") {

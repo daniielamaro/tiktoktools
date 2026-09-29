@@ -183,7 +183,7 @@ button.ghost {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin: 18px 0 0;
 }
@@ -228,7 +228,26 @@ button.ghost {
 .urls article[data-overlay="likes"] h2 { color: var(--likes); }
 .urls article[data-overlay="gifts"] h2 { color: var(--gifts); }
 .urls article[data-overlay="goals"] h2 { color: var(--goals); }
+.urls article[data-overlay="alerts"] h2,
+.urls article[data-overlay="wheel"] h2 { color: var(--goals); }
+.urls article[data-overlay="ticker"] h2,
+.urls article[data-overlay="recent"] h2 { color: var(--gifts); }
+.urls article[data-overlay="combo"] h2 { color: var(--likes); }
 .urls .goal-panel { grid-column: 1 / -1; }
+
+.tools { margin-top: 28px; }
+.tools > h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.tools .urls { margin-top: 0; }
+.tool-preview {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.history-panel { margin-top: 20px; }
+.history-panel .preview { margin-top: 8px; }
 
 .hint {
   min-height: 44px;
@@ -414,7 +433,7 @@ input[type="color"] {
 .limits li + li { margin-top: 8px; }
 
 @media (max-width: 1100px) {
-  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 800px) {

@@ -5,14 +5,21 @@ import {
   UserOfflineError,
   WebcastEvent,
 } from "tiktok-live-connector";
+import { allTimeTotals, recordLive } from "./history.js";
 import {
+  addChat,
+  addFollow,
   addGift,
+  addJoin,
   addLike,
+  addShare,
   applyGiftRanks,
   createRankings,
   normalizeUniqueId,
   resetScores,
+  setViewers,
   snapshot,
+  socialKind,
 } from "./rankings.js";
 
 const sessions = new Map();
@@ -40,9 +47,14 @@ function createSession(userId) {
     connection: null,
     generation: 0,
     listeners: new Set(),
+    eventListeners: new Set(),
     broadcastTimer: null,
     preview: null,
     previewTimer: null,
+    flashTimers: [],
+    historySaved: false,
+    allTime: allTimeTotals(userId),
+    seenSocial: new Map(),
   };
 
   return {
@@ -52,6 +64,10 @@ function createSession(userId) {
     subscribe(listener) {
       ctx.listeners.add(listener);
       return () => ctx.listeners.delete(listener);
+    },
+    subscribeEvents(listener) {
+      ctx.eventListeners.add(listener);
+      return () => ctx.eventListeners.delete(listener);
     },
     connect(rawUniqueId) {
       return connect(ctx, rawUniqueId);
@@ -65,11 +81,23 @@ function createSession(userId) {
     preview() {
       return startPreview(ctx);
     },
+    spin() {
+      return spin(ctx);
+    },
+    countdown(minutes, stop) {
+      return setCountdown(ctx, minutes, stop);
+    },
   };
 }
 
 function published(ctx) {
-  return ctx.preview || snapshot(ctx.rankings);
+  const state = ctx.preview || snapshot(ctx.rankings);
+  return { ...state, allTime: ctx.allTime };
+}
+
+function emitFlash(ctx, event) {
+  if (!event) return;
+  for (const listener of ctx.eventListeners) listener(event);
 }
 
 function emitNow(ctx) {
@@ -162,6 +190,27 @@ async function closeConnection(ctx) {
   }
 }
 
+function onceSocial(ctx, kind, uniqueId) {
+  if (!uniqueId) return false;
+  const key = `${kind}:${uniqueId}`;
+  const now = Date.now();
+  if (now - (ctx.seenSocial.get(key) || 0) < 2000) return false;
+  ctx.seenSocial.set(key, now);
+  return true;
+}
+
+function saveHistory(ctx) {
+  if (ctx.historySaved || !ctx.rankings.uniqueId) return;
+  ctx.historySaved = true;
+  try {
+    recordLive(ctx.userId, snapshot(ctx.rankings));
+    ctx.allTime = allTimeTotals(ctx.userId);
+  } catch (err) {
+    ctx.historySaved = false;
+    console.error("Falha ao gravar histórico:", err?.message || err);
+  }
+}
+
 function bindConnection(ctx, current, generation) {
   const stillCurrent = () => generation === ctx.generation && ctx.connection === current;
 
@@ -173,21 +222,71 @@ function bindConnection(ctx, current, generation) {
 
   current.on(WebcastEvent.GIFT, (data) => {
     if (!stillCurrent()) return;
-    if (addGift(ctx.rankings, withGiftInfo(data, current.availableGifts))) scheduleBroadcast(ctx);
+    const event = addGift(ctx.rankings, withGiftInfo(data, current.availableGifts));
+    if (!event) return;
+    scheduleBroadcast(ctx);
+    emitFlash(ctx, event);
+  });
+
+  current.on(WebcastEvent.CHAT, (data) => {
+    if (!stillCurrent()) return;
+    if (!addChat(ctx.rankings, data)) return;
+    scheduleBroadcast(ctx);
+  });
+
+  current.on(WebcastEvent.FOLLOW, (data) => {
+    if (!stillCurrent()) return;
+    const identity = data?.user || data;
+    if (!onceSocial(ctx, "follow", identity?.uniqueId || identity?.displayId)) return;
+    const event = addFollow(ctx.rankings, data);
+    if (!event) return;
+    scheduleBroadcast(ctx);
+    emitFlash(ctx, event);
+  });
+
+  current.on(WebcastEvent.SHARE, (data) => {
+    if (!stillCurrent()) return;
+    const identity = data?.user || data;
+    if (!onceSocial(ctx, "share", identity?.uniqueId || identity?.displayId)) return;
+    const event = addShare(ctx.rankings, data);
+    if (!event) return;
+    scheduleBroadcast(ctx);
+    emitFlash(ctx, event);
+  });
+
+  current.on(WebcastEvent.SOCIAL, (data) => {
+    if (!stillCurrent()) return;
+    const kind = socialKind(data);
+    if (!kind) return;
+    const uniqueId = data?.user?.uniqueId || data?.uniqueId;
+    if (!onceSocial(ctx, kind, uniqueId)) return;
+    const event = kind === "share" ? addShare(ctx.rankings, data) : addFollow(ctx.rankings, data);
+    if (!event) return;
+    scheduleBroadcast(ctx);
+    emitFlash(ctx, event);
+  });
+
+  current.on(WebcastEvent.MEMBER, (data) => {
+    if (!stillCurrent()) return;
+    const event = addJoin(ctx.rankings, data);
+    if (!event) return;
+    scheduleBroadcast(ctx);
+    emitFlash(ctx, event);
   });
 
   current.on(WebcastEvent.ROOM_USER, (data) => {
     if (!stillCurrent()) return;
     const viewers = viewersFromRoomUser(data);
-    if (viewers !== null) ctx.rankings.viewers = viewers;
+    const viewersChanged = viewers !== null && setViewers(ctx.rankings, viewers);
     if (applyGiftRanks(ctx.rankings, data?.ranks)) scheduleBroadcast(ctx);
-    else if (viewers !== null) scheduleBroadcast(ctx);
+    else if (viewersChanged) scheduleBroadcast(ctx);
   });
 
   current.on(WebcastEvent.STREAM_END, () => {
     if (!stillCurrent()) return;
     ctx.rankings.status = "offline";
     ctx.rankings.message = "A live encerrou.";
+    saveHistory(ctx);
     emitNow(ctx);
   });
 
@@ -196,6 +295,7 @@ function bindConnection(ctx, current, generation) {
     if (ctx.rankings.status === "offline") return;
     ctx.rankings.status = "offline";
     ctx.rankings.message = "A conexão com a live caiu.";
+    saveHistory(ctx);
     emitNow(ctx);
   });
 }
@@ -209,6 +309,7 @@ async function connect(ctx, rawUniqueId) {
   }
 
   const generation = ++ctx.generation;
+  if (ctx.rankings.status === "live" || ctx.rankings.status === "offline") saveHistory(ctx);
   await closeConnection(ctx);
 
   ctx.rankings = createRankings();
@@ -216,6 +317,9 @@ async function connect(ctx, rawUniqueId) {
   ctx.rankings.uniqueId = uniqueId;
   ctx.rankings.message = "Conectando na live…";
   ctx.rankings.holdEvents = true;
+  ctx.rankings.startedAt = Date.now();
+  ctx.historySaved = false;
+  ctx.seenSocial = new Map();
   emitNow(ctx);
 
   const next = new TikTokLiveConnection(uniqueId, {
@@ -231,7 +335,7 @@ async function connect(ctx, rawUniqueId) {
     ctx.rankings.roomId = String(state?.roomId || next.roomId || "");
     ctx.rankings.message = "";
     const viewerCount = viewersFromRoomInfo(next.roomInfo);
-    if (viewerCount !== null) ctx.rankings.viewers = viewerCount;
+    if (viewerCount !== null) setViewers(ctx.rankings, viewerCount);
     const roomLikes = likesFromRoomInfo(next.roomInfo);
     if (roomLikes !== null) {
       ctx.rankings.totalLikes = roomLikes;
@@ -262,6 +366,7 @@ async function connect(ctx, rawUniqueId) {
 async function disconnect(ctx) {
   ctx.generation += 1;
   clearPreview(ctx);
+  if (ctx.rankings.status === "live" || ctx.rankings.status === "offline") saveHistory(ctx);
   await closeConnection(ctx);
   ctx.rankings = createRankings();
   emitNow(ctx);
@@ -296,11 +401,21 @@ function previewPeople() {
   }));
 }
 
+function clearFlashTimers(ctx) {
+  for (const timer of ctx.flashTimers || []) clearTimeout(timer);
+  ctx.flashTimers = [];
+}
+
+function laterFlash(ctx, delay, event) {
+  ctx.flashTimers.push(setTimeout(() => emitFlash(ctx, event), delay));
+}
+
 function clearPreview(ctx) {
   if (ctx.previewTimer) {
     clearTimeout(ctx.previewTimer);
     ctx.previewTimer = null;
   }
+  clearFlashTimers(ctx);
   ctx.preview = null;
 }
 
@@ -309,6 +424,22 @@ function startPreview(ctx) {
   const people = previewPeople();
   const likeScores = [1840, 1260, 980, 410, 155];
   const giftScores = [860, 540, 310, 120, 40];
+  const gifts = ["Rosa", "Universo", "Leão", "Rosa", "Coração"];
+  const now = Date.now();
+  const comments = [
+    { kind: "chat", ...people[0], comment: "bora bater a meta!", at: now },
+    { kind: "chat", ...people[1], comment: "live top demais", at: now },
+    { kind: "chat", ...people[2], comment: "mande rosa 🌹", at: now },
+  ];
+  const recentGifts = people.map((person, index) => ({
+    kind: "gift",
+    ...person,
+    giftName: gifts[index],
+    giftPicture: "",
+    diamonds: giftScores[index],
+    count: index === 0 ? 12 : 1,
+    at: now,
+  }));
   const real = snapshot(ctx.rankings);
   ctx.preview = {
     ...real,
@@ -318,14 +449,70 @@ function startPreview(ctx) {
     trackedLikes: likeScores.reduce((sum, value) => sum + value, 0),
     totalDiamonds: giftScores.reduce((sum, value) => sum + value, 0),
     viewers: 842,
+    peakViewers: 910,
+    startedAt: now - 18 * 60_000,
+    durationMs: 18 * 60_000,
+    followCount: 37,
+    shareCount: 11,
+    joinCount: 64,
     topLikers: people.map((person, index) => ({ ...person, likes: likeScores[index] })),
     topGifters: [...people].reverse().map((person, index) => ({ ...person, diamonds: giftScores[index] })),
+    comments,
+    recentGifts,
+    recentGifters: people.slice(0, 5),
+    lastGift: recentGifts[0],
+    likeCombo: { ...people[2], count: 42, at: now },
+    giftCounts: { rosa: 48, universo: 3, leão: 1, coração: 9 },
+    recentFollows: people.slice(0, 3).map((person) => ({ kind: "follow", ...person, at: now })),
+    recentShares: people.slice(1, 3).map((person) => ({ kind: "share", ...person, at: now })),
+    recentJoins: people.slice(0, 4).map((person) => ({ kind: "join", ...person, at: now })),
+    spin: { ...people[0], at: now },
+    countdownEndsAt: now + 8 * 60_000,
+    allTime: ctx.allTime,
   };
   emitNow(ctx);
+  laterFlash(ctx, 200, recentGifts[0]);
+  laterFlash(ctx, 1800, { kind: "follow", ...people[1], at: now });
+  laterFlash(ctx, 3600, { kind: "share", ...people[3], at: now });
+  laterFlash(ctx, 5400, { kind: "join", ...people[4], at: now });
+  laterFlash(ctx, 7200, { kind: "spin", ...people[0], at: now });
   ctx.previewTimer = setTimeout(() => {
     ctx.previewTimer = null;
+    clearFlashTimers(ctx);
     ctx.preview = null;
     emitNow(ctx);
   }, PREVIEW_MS);
+  return published(ctx);
+}
+
+function spin(ctx) {
+  const state = published(ctx);
+  const pool = (state.recentGifters?.length ? state.recentGifters : state.topGifters) || [];
+  if (!pool.length) {
+    const error = new Error("Ainda não há gifters para sortear. Conecte a live ou use o teste de 15 segundos.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const winner = pool[Math.floor(Math.random() * pool.length)];
+  const event = { kind: "spin", uniqueId: winner.uniqueId, nickname: winner.nickname, avatar: winner.avatar, at: Date.now() };
+  ctx.rankings.spin = event;
+  if (ctx.preview) ctx.preview = { ...ctx.preview, spin: event };
+  emitFlash(ctx, event);
+  emitNow(ctx);
+  return published(ctx);
+}
+
+function setCountdown(ctx, minutes, stop) {
+  if (stop) {
+    ctx.rankings.countdownEndsAt = 0;
+    if (ctx.preview) ctx.preview = { ...ctx.preview, countdownEndsAt: 0 };
+    emitNow(ctx);
+    return published(ctx);
+  }
+  const mins = Math.min(180, Math.max(1, Number.parseInt(minutes, 10) || 20));
+  const endsAt = Date.now() + mins * 60_000;
+  ctx.rankings.countdownEndsAt = endsAt;
+  if (ctx.preview) ctx.preview = { ...ctx.preview, countdownEndsAt: endsAt };
+  emitNow(ctx);
   return published(ctx);
 }

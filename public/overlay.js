@@ -6,13 +6,21 @@ const goalTrack = document.querySelector("#goal-track");
 const goalFill = document.querySelector("#goal-fill");
 const goalCounts = document.querySelector("#goal-counts");
 const goalPercent = document.querySelector("#goal-percent");
-const mode = location.pathname.includes("/goals")
-  ? "goals"
-  : location.pathname.includes("/gifts")
-    ? "gifts"
-    : "likes";
+const goalStep = document.querySelector("#goal-step");
+const goalSecond = document.querySelector("#goal-second");
+const goalSecondLabel = document.querySelector("#goal-second-label");
+const goalTrack2 = document.querySelector("#goal-track-2");
+const goalFill2 = document.querySelector("#goal-fill-2");
+const goalCounts2 = document.querySelector("#goal-counts-2");
+const goalPercent2 = document.querySelector("#goal-percent-2");
+const stage = document.querySelector("#stage");
+const MODES = new Set(["likes", "gifts", "goals", "alerts", "ticker", "recent", "combo", "stats", "countdown", "chat", "wheel"]);
+const pathMode = location.pathname.replace(/\/$/, "").split("/").pop();
+const mode = MODES.has(pathMode) ? pathMode : "likes";
 const numberFormat = new Intl.NumberFormat("pt-BR");
 const overlayKey = new URLSearchParams(location.search).get("key") || "";
+const RANK_MODES = new Set(["likes", "gifts"]);
+const TOOL_MODES = new Set(["alerts", "ticker", "recent", "combo", "stats", "countdown", "chat", "wheel"]);
 const GOAL_STYLE = {
   showTitle: true,
   title: "Meta de curtidas",
@@ -24,14 +32,30 @@ const GOAL_STYLE = {
   scoreColor: "#ffffff",
   showPercent: true,
   showCounts: true,
+  milestones: "",
+  showSecond: false,
+  secondMetric: "diamonds",
+  secondTarget: 1000,
+  sound: false,
+  giftName: "",
+};
+const KIND_LABEL = {
+  gift: "presente",
+  follow: "seguiu",
+  share: "compartilhou",
+  join: "entrou",
 };
 
 card.classList.add(mode);
-if (mode === "goals") rows.hidden = true;
+if (mode === "goals" || TOOL_MODES.has(mode)) rows.hidden = true;
 
 let stylePack = null;
 let lastState = { status: "idle", topLikers: [], topGifters: [] };
 let missingKey = !overlayKey;
+let goalWasReached = false;
+let alertQueue = [];
+let alertBusy = false;
+let clockTimer = 0;
 
 function topLimit() {
   const params = new URLSearchParams(location.search);
@@ -42,7 +66,10 @@ function topLimit() {
 
 function currentStyle() {
   if (mode === "goals") return stylePack?.goals || GOAL_STYLE;
-  const pack = stylePack?.[mode] || {
+  if (TOOL_MODES.has(mode)) {
+    return stylePack?.[mode] || { showTitle: true, title: "", titleColor: "#ffffff", nameColor: "#ffffff", scoreColor: "#ffffff" };
+  }
+  return stylePack?.[mode] || {
     showTitle: true,
     title: mode === "gifts" ? "Top presentes" : "Top curtidas",
     titleColor: mode === "gifts" ? "#7ef6ec" : "#ff7a90",
@@ -51,7 +78,6 @@ function currentStyle() {
     placeNameColors: { 1: "#ffffff", 2: "#ffffff", 3: "#ffffff" },
     frames: { 1: "", 2: "", 3: "" },
   };
-  return pack;
 }
 
 function frameUrl(place) {
@@ -71,6 +97,7 @@ function nameColorFor(place) {
   if (place <= 3) return textColor(style.placeNameColors?.[place], general);
   return general;
 }
+
 function initial(name) {
   const letter = String(name || "?").trim().charAt(0);
   return letter ? letter.toUpperCase() : "?";
@@ -87,7 +114,7 @@ function preload(url) {
 }
 
 function warmImages() {
-  if (mode === "goals") return;
+  if (!RANK_MODES.has(mode)) return;
   preload(mode === "gifts" ? "/assets/moeda.png" : "/assets/coracao.png");
   for (const place of ["1", "2", "3"]) preload(frameUrl(place));
 }
@@ -244,49 +271,402 @@ function paintRows(list) {
   if (!same) rows.replaceChildren(...nodes);
 }
 
-function goalValue(state, metric) {
+function metricValue(state, metric, giftName) {
   if (metric === "diamonds") return Number(state?.totalDiamonds) || 0;
   if (metric === "viewers") return Number(state?.viewers) || 0;
+  if (metric === "follows") return Number(state?.followCount) || 0;
+  if (metric === "shares") return Number(state?.shareCount) || 0;
+  if (metric === "gift") {
+    const key = String(giftName || "").trim().toLowerCase();
+    return Number(state?.giftCounts?.[key]) || 0;
+  }
   return Number(state?.totalLikes) || 0;
+}
+
+function activeGoal(style, current) {
+  const marks = String(style.milestones || "")
+    .split(",")
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const unique = [...new Set(marks)].sort((a, b) => a - b);
+  if (!unique.length) return { target: Math.max(1, Number(style.target) || 10000), step: 0, total: 0 };
+  const next = unique.find((n) => current < n) || unique[unique.length - 1];
+  return { target: next, step: unique.indexOf(next) + 1, total: unique.length };
+}
+
+function fillBar(track, fill, countsEl, percentEl, style, current, target, label) {
+  const ratio = Math.min(1, current / Math.max(1, target));
+  const percent = Math.round(ratio * 100);
+  const scoreColor = textColor(style.scoreColor, "#ffffff");
+  track.style.background = textColor(style.barTrackColor, "#2a3140");
+  fill.style.background = textColor(style.barColor, "#ffd166");
+  fill.style.width = `${ratio * 100}%`;
+  if (style.showCounts) {
+    countsEl.hidden = false;
+    countsEl.style.color = scoreColor;
+    countsEl.textContent = `${label ? `${label} ` : ""}${numberFormat.format(current)} / ${numberFormat.format(target)}`;
+  } else {
+    countsEl.hidden = true;
+    countsEl.textContent = "";
+  }
+  if (style.showPercent) {
+    percentEl.hidden = false;
+    percentEl.style.color = scoreColor;
+    percentEl.textContent = `${percent}%`;
+  } else {
+    percentEl.hidden = true;
+    percentEl.textContent = "";
+  }
+  return ratio >= 1;
+}
+
+function playGoalSound() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  const ctx = new AudioCtx();
+  const now = ctx.currentTime;
+  [523, 659, 784].forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02 + index * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28 + index * 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + index * 0.08);
+    osc.stop(now + 0.32 + index * 0.08);
+  });
+  setTimeout(() => ctx.close().catch(() => {}), 1200);
 }
 
 function paintGoal() {
   const style = currentStyle();
-  const target = Math.max(1, Number(style.target) || GOAL_STYLE.target);
-  const current = goalValue(lastState, style.metric);
-  const ratio = Math.min(1, current / target);
-  const percent = Math.round(ratio * 100);
-  const scoreColor = textColor(style.scoreColor, "#ffffff");
+  const current = metricValue(lastState, style.metric, style.giftName);
+  const active = activeGoal(style, current);
   goal.hidden = false;
   rows.hidden = true;
-  goal.classList.toggle("reached", ratio >= 1);
-  goalTrack.style.background = textColor(style.barTrackColor, "#2a3140");
-  goalFill.style.background = textColor(style.barColor, "#ffd166");
-  goalFill.style.width = `${ratio * 100}%`;
-  if (style.showCounts) {
-    goalCounts.hidden = false;
-    goalCounts.style.color = scoreColor;
-    goalCounts.textContent = `${numberFormat.format(current)} / ${numberFormat.format(target)}`;
+  stage.hidden = true;
+  if (active.total) {
+    goalStep.hidden = false;
+    goalStep.textContent = `Marco ${active.step} de ${active.total}`;
   } else {
-    goalCounts.hidden = true;
-    goalCounts.textContent = "";
+    goalStep.hidden = true;
+    goalStep.textContent = "";
   }
-  if (style.showPercent) {
-    goalPercent.hidden = false;
-    goalPercent.style.color = scoreColor;
-    goalPercent.textContent = `${percent}%`;
+  const reached = fillBar(goalTrack, goalFill, goalCounts, goalPercent, style, current, active.target);
+  goal.classList.toggle("reached", reached);
+  if (reached && !goalWasReached && style.sound) playGoalSound();
+  goalWasReached = reached;
+  if (style.showSecond) {
+    goalSecond.hidden = false;
+    const secondCurrent = metricValue(lastState, style.secondMetric, style.giftName);
+    const secondTarget = Math.max(1, Number(style.secondTarget) || 1000);
+    goalSecondLabel.textContent = style.secondMetric === "diamonds" ? "Diamantes" : style.secondMetric === "likes" ? "Curtidas" : style.secondMetric;
+    fillBar(goalTrack2, goalFill2, goalCounts2, goalPercent2, style, secondCurrent, secondTarget);
   } else {
-    goalPercent.hidden = true;
-    goalPercent.textContent = "";
+    goalSecond.hidden = true;
   }
+}
+
+function faceNode(avatar, name) {
+  if (avatar) {
+    const image = document.createElement("img");
+    image.className = "face";
+    image.alt = "";
+    image.decoding = "async";
+    image.referrerPolicy = "no-referrer";
+    image.src = avatar;
+    image.addEventListener("error", () => {
+      const fallback = document.createElement("span");
+      fallback.className = "face fallback";
+      fallback.textContent = initial(name);
+      image.replaceWith(fallback);
+    });
+    return image;
+  }
+  const fallback = document.createElement("span");
+  fallback.className = "face fallback";
+  fallback.textContent = initial(name);
+  return fallback;
+}
+
+function showStage(htmlNode) {
+  goal.hidden = true;
+  rows.hidden = true;
+  stage.hidden = false;
+  stage.replaceChildren(htmlNode);
+}
+
+function waitingStage(text) {
+  const wrap = document.createElement("div");
+  wrap.className = "waiting-stage";
+  const mark = document.createElement("span");
+  mark.className = "pulse";
+  const label = document.createElement("span");
+  label.textContent = text;
+  wrap.append(mark, label);
+  showStage(wrap);
+}
+
+function paintTicker() {
+  const gift = lastState.lastGift;
+  if (!gift) {
+    waitingStage("Aguardando um presente");
+    return;
+  }
+  const style = currentStyle();
+  const line = document.createElement("div");
+  line.className = "ticker";
+  line.style.color = textColor(style.nameColor, "#ffffff");
+  const text = document.createElement("span");
+  text.className = "ticker-text";
+  text.textContent = `${gift.nickname} enviou ${gift.giftName}${gift.count > 1 ? ` x${gift.count}` : ""} · ${numberFormat.format(gift.diamonds)} diamantes`;
+  line.append(text);
+  showStage(line);
+}
+
+function paintRecent() {
+  const list = lastState.recentGifters || [];
+  if (!list.length) {
+    waitingStage("Aguardando presentes");
+    return;
+  }
+  const style = currentStyle();
+  const ol = document.createElement("ol");
+  ol.className = "feed";
+  for (const row of list) {
+    const item = document.createElement("li");
+    item.append(faceNode(row.avatar, row.nickname));
+    const name = document.createElement("span");
+    name.className = "name";
+    name.style.color = textColor(style.nameColor, "#ffffff");
+    name.textContent = row.nickname;
+    item.append(name);
+    ol.append(item);
+  }
+  showStage(ol);
+}
+
+function paintCombo() {
+  const combo = lastState.likeCombo;
+  if (!combo || Date.now() - Number(combo.at || 0) > 4000) {
+    waitingStage("Aguardando combo de curtidas");
+    return;
+  }
+  const style = currentStyle();
+  const wrap = document.createElement("div");
+  wrap.className = "combo";
+  wrap.append(faceNode(combo.avatar, combo.nickname));
+  const name = document.createElement("span");
+  name.className = "name";
+  name.style.color = textColor(style.nameColor, "#ffffff");
+  name.textContent = combo.nickname;
+  const score = document.createElement("span");
+  score.className = "combo-count";
+  score.style.color = textColor(style.scoreColor, "#ff7a90");
+  score.textContent = `x${numberFormat.format(combo.count)}`;
+  wrap.append(name, score);
+  showStage(wrap);
+}
+
+function formatDuration(ms) {
+  const total = Math.max(0, Math.floor(Number(ms) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function paintStats() {
+  const style = currentStyle();
+  const color = textColor(style.scoreColor, "#ffffff");
+  const muted = textColor(style.nameColor, "#ffffff");
+  const items = [
+    ["Espectadores", numberFormat.format(lastState.viewers || 0)],
+    ["Pico", numberFormat.format(lastState.peakViewers || 0)],
+    ["Curtidas", lastState.totalLikesKnown ? numberFormat.format(lastState.totalLikes || 0) : "—"],
+    ["Diamantes", numberFormat.format(lastState.totalDiamonds || 0)],
+    ["Follows", numberFormat.format(lastState.followCount || 0)],
+    ["Tempo", formatDuration(lastState.durationMs)],
+  ];
+  const allTime = lastState.allTime;
+  if (allTime?.lives) {
+    items.push(["Lives", numberFormat.format(allTime.lives)]);
+    items.push(["Histórico ♦", numberFormat.format(allTime.diamonds || 0)]);
+  }
+  const grid = document.createElement("dl");
+  grid.className = "stats-grid";
+  for (const [label, value] of items) {
+    const block = document.createElement("div");
+    const dt = document.createElement("dt");
+    dt.style.color = muted;
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.style.color = color;
+    dd.textContent = value;
+    block.append(dt, dd);
+    grid.append(block);
+  }
+  showStage(grid);
+}
+
+function remainingClock() {
+  const ends = Number(lastState.countdownEndsAt) || 0;
+  if (!ends) return null;
+  return Math.max(0, ends - Date.now());
+}
+
+function paintCountdown() {
+  const left = remainingClock();
+  const style = currentStyle();
+  const wrap = document.createElement("div");
+  wrap.className = "clock";
+  wrap.style.color = textColor(style.scoreColor, "#ffffff");
+  wrap.textContent = left == null ? "—" : formatDuration(left);
+  if (left === 0) wrap.classList.add("done");
+  showStage(wrap);
+}
+
+function paintChat() {
+  const list = lastState.comments || [];
+  if (!list.length) {
+    waitingStage("Aguardando comentários");
+    return;
+  }
+  const style = currentStyle();
+  const ol = document.createElement("ol");
+  ol.className = "chat";
+  for (const row of [...list].reverse()) {
+    const item = document.createElement("li");
+    const who = document.createElement("span");
+    who.className = "name";
+    who.style.color = textColor(style.nameColor, "#7ef6ec");
+    who.textContent = row.nickname;
+    const text = document.createElement("span");
+    text.textContent = ` ${row.comment}`;
+    item.append(who, text);
+    ol.append(item);
+  }
+  showStage(ol);
+}
+
+function paintWheel() {
+  const winner = lastState.spin;
+  const style = currentStyle();
+  const wrap = document.createElement("div");
+  wrap.className = "wheel";
+  if (!winner) {
+    waitingStage("Aguardando sorteio");
+    return;
+  }
+  wrap.append(faceNode(winner.avatar, winner.nickname));
+  const name = document.createElement("span");
+  name.className = "wheel-name winner";
+  name.style.color = textColor(style.nameColor, "#ffd166");
+  name.textContent = winner.nickname;
+  const tag = document.createElement("span");
+  tag.className = "wheel-tag";
+  tag.textContent = "Ganhou o sorteio";
+  wrap.append(name, tag);
+  showStage(wrap);
+}
+
+function paintAlert(event) {
+  const style = currentStyle();
+  const wrap = document.createElement("div");
+  wrap.className = `alert kind-${event.kind}`;
+  wrap.append(faceNode(event.avatar, event.nickname));
+  const copy = document.createElement("div");
+  copy.className = "alert-copy";
+  const name = document.createElement("span");
+  name.className = "name";
+  name.style.color = textColor(style.nameColor, "#ffffff");
+  name.textContent = event.nickname;
+  const detail = document.createElement("span");
+  detail.className = "alert-detail";
+  if (event.kind === "gift") {
+    detail.textContent = `enviou ${event.giftName}${event.count > 1 ? ` x${event.count}` : ""} · ${numberFormat.format(event.diamonds || 0)} ♦`;
+  } else {
+    detail.textContent = KIND_LABEL[event.kind] || event.kind;
+  }
+  copy.append(name, detail);
+  if (event.giftPicture) {
+    const gift = document.createElement("img");
+    gift.className = "gift-pic";
+    gift.alt = "";
+    gift.src = event.giftPicture;
+    wrap.append(copy, gift);
+  } else {
+    wrap.append(copy);
+  }
+  showStage(wrap);
+}
+
+function pumpAlerts() {
+  if (alertBusy || mode !== "alerts") return;
+  const event = alertQueue.shift();
+  if (!event) {
+    if (!stage.firstElementChild) waitingStage("Aguardando alertas");
+    return;
+  }
+  alertBusy = true;
+  paintAlert(event);
+  const ms = Math.max(2000, (Number(currentStyle().duration) || 5) * 1000);
+  setTimeout(() => {
+    alertBusy = false;
+    pumpAlerts();
+  }, ms);
+}
+
+function acceptAlert(event) {
+  const style = currentStyle();
+  if (event.kind === "gift") return style.gifts !== false;
+  if (event.kind === "follow") return style.follows !== false;
+  if (event.kind === "share") return style.shares !== false;
+  if (event.kind === "join") return Boolean(style.joins);
+  return false;
+}
+
+function handleEvent(event) {
+  if (!event || missingKey) return;
+  if (mode === "alerts" && acceptAlert(event)) {
+    alertQueue.push(event);
+    pumpAlerts();
+    return;
+  }
+  if (mode === "wheel" && event.kind === "spin") {
+    lastState = { ...lastState, spin: event };
+    paintWheel();
+  }
+}
+
+function paintTool() {
+  if (mode === "alerts") {
+    if (!alertBusy && !alertQueue.length) waitingStage("Aguardando alertas");
+    return;
+  }
+  if (mode === "ticker") return paintTicker();
+  if (mode === "recent") return paintRecent();
+  if (mode === "combo") return paintCombo();
+  if (mode === "stats") return paintStats();
+  if (mode === "countdown") return paintCountdown();
+  if (mode === "chat") return paintChat();
+  if (mode === "wheel") return paintWheel();
 }
 
 function render(state) {
   lastState = state || lastState;
+  if (lastState.startedAt && !lastState.durationMs) {
+    lastState = { ...lastState, durationMs: Date.now() - lastState.startedAt };
+  }
   warmImages();
   applyTitle();
   if (missingKey) {
     goal.hidden = true;
+    stage.hidden = true;
     rows.hidden = false;
     paintMessage("Link sem a chave da conta.", false);
     return;
@@ -295,7 +675,12 @@ function render(state) {
     paintGoal();
     return;
   }
+  if (TOOL_MODES.has(mode)) {
+    paintTool();
+    return;
+  }
   goal.hidden = true;
+  stage.hidden = true;
   rows.hidden = false;
   const limit = topLimit();
   const source = mode === "gifts" ? lastState.topGifters : lastState.topLikers;
@@ -317,11 +702,21 @@ function connectSocket() {
       render(lastState);
     }
     if (payload.state) render(payload.state);
+    if (payload.event) handleEvent(payload.event);
   });
   socket.addEventListener("close", (event) => {
     if (event.code === 1008) return;
     setTimeout(connectSocket, 1000);
   });
+}
+
+if (mode === "countdown" || mode === "combo" || mode === "stats") {
+  clockTimer = setInterval(() => {
+    if (mode === "stats" && lastState.startedAt) {
+      lastState = { ...lastState, durationMs: Date.now() - lastState.startedAt };
+    }
+    if (mode === "countdown" || mode === "combo" || mode === "stats") render(lastState);
+  }, 500);
 }
 
 if (overlayKey) {
@@ -338,3 +733,4 @@ if (overlayKey) {
   render(lastState);
 }
 connectSocket();
+void clockTimer;
