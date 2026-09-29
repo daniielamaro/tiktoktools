@@ -16,9 +16,74 @@ const DEFAULTS = {
   gifts: { showTitle: true, title: "Top presentes", titleColor: "#7ef6ec" },
 };
 const TEXT_COLOR = "#ffffff";
+const GOAL_METRICS = new Set(["likes", "diamonds", "viewers"]);
+const GOAL_DEFAULTS = {
+  showTitle: true,
+  title: "Meta de curtidas",
+  titleColor: "#ffd166",
+  metric: "likes",
+  target: 10000,
+  barColor: "#ffd166",
+  barTrackColor: "#2a3140",
+  scoreColor: TEXT_COLOR,
+  showPercent: true,
+  showCounts: true,
+};
 
 function hexColor(value, fallback) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || "")) ? String(value) : fallback;
+}
+
+function goalMetric(value) {
+  return GOAL_METRICS.has(value) ? value : GOAL_DEFAULTS.metric;
+}
+
+function goalTarget(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return GOAL_DEFAULTS.target;
+  return Math.min(1_000_000_000, parsed);
+}
+
+function defaultGoalStyle() {
+  return { ...GOAL_DEFAULTS };
+}
+
+function parseGoalStored(raw) {
+  const fallback = defaultGoalStyle();
+  if (!raw) return fallback;
+  try {
+    const data = JSON.parse(raw);
+    return {
+      showTitle: Boolean(data.showTitle),
+      title: String(data.title || "").trim().slice(0, 40),
+      titleColor: hexColor(data.titleColor, fallback.titleColor),
+      metric: goalMetric(data.metric),
+      target: goalTarget(data.target),
+      barColor: hexColor(data.barColor, fallback.barColor),
+      barTrackColor: hexColor(data.barTrackColor, fallback.barTrackColor),
+      scoreColor: hexColor(data.scoreColor, fallback.scoreColor),
+      showPercent: Boolean(data.showPercent),
+      showCounts: Boolean(data.showCounts),
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildGoalStyle(body) {
+  const fallback = defaultGoalStyle();
+  return {
+    showTitle: Boolean(body?.showTitle),
+    title: String(body?.title || "").trim().slice(0, 40),
+    titleColor: hexColor(body?.titleColor, fallback.titleColor),
+    metric: goalMetric(body?.metric),
+    target: goalTarget(body?.target),
+    barColor: hexColor(body?.barColor, fallback.barColor),
+    barTrackColor: hexColor(body?.barTrackColor, fallback.barTrackColor),
+    scoreColor: hexColor(body?.scoreColor, fallback.scoreColor),
+    showPercent: Boolean(body?.showPercent),
+    showCounts: Boolean(body?.showCounts),
+  };
 }
 
 export function listFrames() {
@@ -92,15 +157,20 @@ function parseStored(raw, mode, catalog) {
 
 export function readStyles(userId) {
   const catalog = listFrames();
-  const row = db.prepare("SELECT overlay_likes, overlay_gifts FROM users WHERE id = ?").get(userId);
+  const row = db.prepare("SELECT overlay_likes, overlay_gifts, overlay_goals FROM users WHERE id = ?").get(userId);
   return {
     catalog,
     likes: parseStored(row?.overlay_likes, "likes", catalog),
     gifts: parseStored(row?.overlay_gifts, "gifts", catalog),
+    goals: parseGoalStored(row?.overlay_goals),
   };
 }
 
 export function saveStyle(userId, mode, body) {
+  if (mode === "goals") {
+    db.prepare("UPDATE users SET overlay_goals = ? WHERE id = ?").run(JSON.stringify(buildGoalStyle(body)), userId);
+    return readStyles(userId);
+  }
   if (mode !== "likes" && mode !== "gifts") {
     const error = new Error("Overlay desconhecido.");
     error.statusCode = 400;

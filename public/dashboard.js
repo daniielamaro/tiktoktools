@@ -11,8 +11,16 @@ const statusMessage = document.querySelector("#status-message");
 const topCount = document.querySelector("#top-count");
 const urlLikes = document.querySelector("#url-likes");
 const urlGifts = document.querySelector("#url-gifts");
+const urlGoals = document.querySelector("#url-goals");
 const previewLikes = document.querySelector("#preview-likes");
 const previewGifts = document.querySelector("#preview-gifts");
+const previewGoals = document.querySelector("#preview-goals");
+const goalForm = document.querySelector(".style-form[data-mode='goals']");
+const GOAL_TITLES = {
+  likes: "Meta de curtidas",
+  diamonds: "Meta de diamantes",
+  viewers: "Meta de espectadores",
+};
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
 const usdFormat = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
@@ -40,6 +48,7 @@ function overlayUrls() {
   return {
     likes: `${location.origin}/overlay/likes?key=${key}&top=${top}`,
     gifts: `${location.origin}/overlay/gifts?key=${key}&top=${top}`,
+    goals: `${location.origin}/overlay/goals?key=${key}`,
   };
 }
 
@@ -47,6 +56,7 @@ function renderUrls() {
   const urls = overlayUrls();
   urlLikes.textContent = urls.likes;
   urlGifts.textContent = urls.gifts;
+  urlGoals.textContent = urls.goals;
 }
 
 const PLACE_LABEL = { 1: "1º lugar", 2: "2º lugar", 3: "3º lugar" };
@@ -56,8 +66,64 @@ function selectedFile(form, place) {
   return button?.dataset.file || "";
 }
 
-function colorValue(value) {
-  return /^#[0-9a-fA-F]{6}$/.test(value || "") ? value : "#ffffff";
+function colorValue(value, fallback = "#ffffff") {
+  return /^#[0-9a-fA-F]{6}$/.test(value || "") ? value : fallback;
+}
+
+function goalValue(next, metric) {
+  if (metric === "diamonds") return Number(next?.totalDiamonds) || 0;
+  if (metric === "viewers") return Number(next?.viewers) || 0;
+  return Number(next?.totalLikes) || 0;
+}
+
+function goalStyleFromForm(form) {
+  return {
+    showTitle: form.showTitle.checked,
+    title: form.title.value,
+    titleColor: form.titleColor.value,
+    metric: form.metric.value,
+    target: Number.parseInt(form.target.value, 10) || 10000,
+    barColor: form.barColor.value,
+    barTrackColor: form.barTrackColor.value,
+    scoreColor: form.scoreColor.value,
+    showCounts: form.showCounts.checked,
+    showPercent: form.showPercent.checked,
+  };
+}
+
+function fillGoalForm(form, style) {
+  form.showTitle.checked = Boolean(style.showTitle);
+  form.title.value = style.title || "";
+  form.titleColor.value = colorValue(style.titleColor, "#ffd166");
+  form.metric.value = GOAL_TITLES[style.metric] ? style.metric : "likes";
+  form.target.value = String(style.target || 10000);
+  form.barColor.value = colorValue(style.barColor, "#ffd166");
+  form.barTrackColor.value = colorValue(style.barTrackColor, "#2a3140");
+  form.scoreColor.value = colorValue(style.scoreColor);
+  form.showCounts.checked = Boolean(style.showCounts);
+  form.showPercent.checked = Boolean(style.showPercent);
+}
+
+function renderGoalPreview(next, style) {
+  if (!previewGoals) return;
+  const fill = previewGoals.querySelector(".goal-fill");
+  const track = previewGoals.querySelector(".goal-track");
+  const counts = previewGoals.querySelector(".goal-counts");
+  const percentLabel = previewGoals.querySelector(".goal-percent");
+  const target = Math.max(1, Number(style.target) || 10000);
+  const current = goalValue(next, style.metric);
+  const ratio = Math.min(1, current / target);
+  const percent = Math.round(ratio * 100);
+  previewGoals.classList.toggle("reached", ratio >= 1);
+  track.style.background = colorValue(style.barTrackColor, "#2a3140");
+  fill.style.background = colorValue(style.barColor, "#ffd166");
+  fill.style.width = `${ratio * 100}%`;
+  counts.textContent = style.showCounts
+    ? `${numberFormat.format(current)} / ${numberFormat.format(target)}`
+    : "";
+  counts.style.color = colorValue(style.scoreColor);
+  percentLabel.textContent = style.showPercent ? `${percent}%` : "";
+  percentLabel.style.color = colorValue(style.scoreColor);
 }
 
 function fillForm(form, catalog, style) {
@@ -105,6 +171,46 @@ function fillForm(form, catalog, style) {
 
 function bindStyleForms(payload) {
   document.querySelectorAll(".style-form").forEach((form) => {
+    if (form.dataset.mode === "goals") {
+      fillGoalForm(form, payload.goals || {});
+      renderGoalPreview(state || { totalLikes: 0, totalDiamonds: 0, viewers: 0 }, goalStyleFromForm(form));
+      if (form.dataset.bound) return;
+      form.dataset.bound = "1";
+      form.metric.addEventListener("change", () => {
+        const current = form.title.value.trim();
+        if (Object.values(GOAL_TITLES).includes(current)) {
+          form.title.value = GOAL_TITLES[form.metric.value] || GOAL_TITLES.likes;
+        }
+        renderGoalPreview(state || { totalLikes: 0, totalDiamonds: 0, viewers: 0 }, goalStyleFromForm(form));
+      });
+      form.addEventListener("input", () => {
+        if (state) renderGoalPreview(state, goalStyleFromForm(form));
+        else renderGoalPreview({ totalLikes: 0, totalDiamonds: 0, viewers: 0 }, goalStyleFromForm(form));
+      });
+      const note = form.querySelector(".style-note");
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = form.querySelector("button[type='submit']");
+        button.disabled = true;
+        note.textContent = "";
+        try {
+          const saved = await post("/api/overlay-style", {
+            mode: "goals",
+            ...goalStyleFromForm(form),
+          });
+          fillGoalForm(form, saved.goals || {});
+          renderGoalPreview(state || {}, goalStyleFromForm(form));
+          note.className = "style-note";
+          note.textContent = "Visual salvo.";
+        } catch (err) {
+          note.className = "style-note error";
+          note.textContent = err.message;
+        } finally {
+          button.disabled = false;
+        }
+      });
+      return;
+    }
     const style = payload[form.dataset.mode];
     if (style) fillForm(form, payload.catalog || {}, style);
     if (form.dataset.bound) return;
@@ -196,6 +302,7 @@ function render(next) {
   resetBtn.disabled = next.status !== "live" && next.status !== "offline";
   renderPreview(previewLikes, next.topLikers || [], "likes", "curtidas");
   renderPreview(previewGifts, next.topGifters || [], "diamonds", "diamantes");
+  if (goalForm) renderGoalPreview(next, goalStyleFromForm(goalForm));
 }
 
 async function post(path, body) {

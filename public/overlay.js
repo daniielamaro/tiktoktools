@@ -1,11 +1,33 @@
 const card = document.querySelector("#card");
 const title = document.querySelector("#title");
 const rows = document.querySelector("#rows");
-const mode = location.pathname.includes("/gifts") ? "gifts" : "likes";
+const goal = document.querySelector("#goal");
+const goalTrack = document.querySelector("#goal-track");
+const goalFill = document.querySelector("#goal-fill");
+const goalCounts = document.querySelector("#goal-counts");
+const goalPercent = document.querySelector("#goal-percent");
+const mode = location.pathname.includes("/goals")
+  ? "goals"
+  : location.pathname.includes("/gifts")
+    ? "gifts"
+    : "likes";
 const numberFormat = new Intl.NumberFormat("pt-BR");
 const overlayKey = new URLSearchParams(location.search).get("key") || "";
+const GOAL_STYLE = {
+  showTitle: true,
+  title: "Meta de curtidas",
+  titleColor: "#ffd166",
+  metric: "likes",
+  target: 10000,
+  barColor: "#ffd166",
+  barTrackColor: "#2a3140",
+  scoreColor: "#ffffff",
+  showPercent: true,
+  showCounts: true,
+};
 
 card.classList.add(mode);
+if (mode === "goals") rows.hidden = true;
 
 let stylePack = null;
 let lastState = { status: "idle", topLikers: [], topGifters: [] };
@@ -19,6 +41,7 @@ function topLimit() {
 }
 
 function currentStyle() {
+  if (mode === "goals") return stylePack?.goals || GOAL_STYLE;
   const pack = stylePack?.[mode] || {
     showTitle: true,
     title: mode === "gifts" ? "Top presentes" : "Top curtidas",
@@ -64,6 +87,7 @@ function preload(url) {
 }
 
 function warmImages() {
+  if (mode === "goals") return;
   preload(mode === "gifts" ? "/assets/moeda.png" : "/assets/coracao.png");
   for (const place of ["1", "2", "3"]) preload(frameUrl(place));
 }
@@ -220,14 +244,59 @@ function paintRows(list) {
   if (!same) rows.replaceChildren(...nodes);
 }
 
+function goalValue(state, metric) {
+  if (metric === "diamonds") return Number(state?.totalDiamonds) || 0;
+  if (metric === "viewers") return Number(state?.viewers) || 0;
+  return Number(state?.totalLikes) || 0;
+}
+
+function paintGoal() {
+  const style = currentStyle();
+  const target = Math.max(1, Number(style.target) || GOAL_STYLE.target);
+  const current = goalValue(lastState, style.metric);
+  const ratio = Math.min(1, current / target);
+  const percent = Math.round(ratio * 100);
+  const scoreColor = textColor(style.scoreColor, "#ffffff");
+  goal.hidden = false;
+  rows.hidden = true;
+  goal.classList.toggle("reached", ratio >= 1);
+  goalTrack.style.background = textColor(style.barTrackColor, "#2a3140");
+  goalFill.style.background = textColor(style.barColor, "#ffd166");
+  goalFill.style.width = `${ratio * 100}%`;
+  if (style.showCounts) {
+    goalCounts.hidden = false;
+    goalCounts.style.color = scoreColor;
+    goalCounts.textContent = `${numberFormat.format(current)} / ${numberFormat.format(target)}`;
+  } else {
+    goalCounts.hidden = true;
+    goalCounts.textContent = "";
+  }
+  if (style.showPercent) {
+    goalPercent.hidden = false;
+    goalPercent.style.color = scoreColor;
+    goalPercent.textContent = `${percent}%`;
+  } else {
+    goalPercent.hidden = true;
+    goalPercent.textContent = "";
+  }
+}
+
 function render(state) {
   lastState = state || lastState;
   warmImages();
   applyTitle();
   if (missingKey) {
+    goal.hidden = true;
+    rows.hidden = false;
     paintMessage("Link sem a chave da conta.", false);
     return;
   }
+  if (mode === "goals") {
+    paintGoal();
+    return;
+  }
+  goal.hidden = true;
+  rows.hidden = false;
   const limit = topLimit();
   const source = mode === "gifts" ? lastState.topGifters : lastState.topLikers;
   const list = (source || []).slice(0, limit);

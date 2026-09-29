@@ -27,6 +27,7 @@ const STATIC = {
   "/register": "register.html",
   "/overlay/likes": "overlay.html",
   "/overlay/gifts": "overlay.html",
+  "/overlay/goals": "overlay.html",
 };
 
 const TYPES = {

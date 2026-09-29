@@ -35,3 +35,6 @@ if (!userColumns.has("overlay_likes")) {
 if (!userColumns.has("overlay_gifts")) {
   db.exec("ALTER TABLE users ADD COLUMN overlay_gifts TEXT NOT NULL DEFAULT ''");
 }
+if (!userColumns.has("overlay_goals")) {
+  db.exec("ALTER TABLE users ADD COLUMN overlay_goals TEXT NOT NULL DEFAULT ''");
+}

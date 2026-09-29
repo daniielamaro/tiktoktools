@@ -317,6 +317,7 @@ function startPreview(ctx) {
     totalLikes: likeScores.reduce((sum, value) => sum + value, 0),
     trackedLikes: likeScores.reduce((sum, value) => sum + value, 0),
     totalDiamonds: giftScores.reduce((sum, value) => sum + value, 0),
+    viewers: 842,
     topLikers: people.map((person, index) => ({ ...person, likes: likeScores[index] })),
     topGifters: [...people].reverse().map((person, index) => ({ ...person, diamonds: giftScores[index] })),
   };

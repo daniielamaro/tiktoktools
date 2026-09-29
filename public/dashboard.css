@@ -7,6 +7,7 @@
   --muted: #9aa1ad;
   --likes: #ff3b5c;
   --gifts: #2ee6d6;
+  --goals: #ffd166;
   --ok: #3dd68c;
   --warn: #f5c16c;
   --danger: #ff6b6b;
@@ -110,7 +111,8 @@ h1 {
 
 input[type="text"],
 input[type="password"],
-input[type="number"] {
+input[type="number"],
+select {
   height: 44px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -125,6 +127,8 @@ input[type="text"] { flex: 1 1 220px; }
 .auth-form input[type="text"],
 .auth-form input[type="password"] { width: 100%; }
 input[type="number"] { width: 88px; }
+#goal-target { width: 160px; }
+select { max-width: 280px; }
 
 button {
   height: 44px;
@@ -221,8 +225,10 @@ button.ghost {
   font-size: 18px;
 }
 
-.urls article:first-child h2 { color: var(--likes); }
-.urls article:last-child h2 { color: var(--gifts); }
+.urls article[data-overlay="likes"] h2 { color: var(--likes); }
+.urls article[data-overlay="gifts"] h2 { color: var(--gifts); }
+.urls article[data-overlay="goals"] h2 { color: var(--goals); }
+.urls .goal-panel { grid-column: 1 / -1; }
 
 .hint {
   min-height: 44px;
@@ -260,6 +266,48 @@ code {
 .preview .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview .score { font-variant-numeric: tabular-nums; font-weight: 700; }
 .preview .empty { display: block; color: var(--muted); }
+
+.goal-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.goal-preview .goal-track {
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #2a3140;
+}
+
+.goal-preview .goal-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--goals);
+  transition: width 0.35s ease;
+}
+
+.goal-preview.reached .goal-fill {
+  animation: goalPulse 1.4s ease-in-out infinite;
+}
+
+.goal-preview .goal-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 1.2em;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-preview .goal-meta span:empty { display: none; }
+
+@keyframes goalPulse {
+  50% { filter: brightness(1.35); }
+}
 
 .style-form {
   display: grid;

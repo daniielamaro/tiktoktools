@@ -47,7 +47,7 @@
     </section>
 
     <section class="urls">
-      <article class="panel">
+      <article class="panel" data-overlay="likes">
         <header>
           <h2>Top curtidas</h2>
           <button type="button" class="copy" data-copy="likes">Copiar URL</button>
@@ -79,7 +79,7 @@
         </form>
         <ol id="preview-likes" class="preview"></ol>
       </article>
-      <article class="panel">
+      <article class="panel" data-overlay="gifts">
         <header>
           <h2>Top presentes</h2>
           <button type="button" class="copy" data-copy="gifts">Copiar URL</button>
@@ -110,6 +110,47 @@
         </form>
         <ol id="preview-gifts" class="preview"></ol>
       </article>
+
+      <article class="panel goal-panel" data-overlay="goals">
+        <header>
+          <h2>Meta</h2>
+          <button type="button" class="copy" data-copy="goals">Copiar URL</button>
+        </header>
+        <p class="hint">Barra de progresso com curtidas, diamantes ou espectadores desta conexão.</p>
+        <code id="url-goals"></code>
+        <form class="style-form" data-mode="goals">
+          <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+          <label class="top-label" for="title-goals">Título</label>
+          <div class="style-row">
+            <input id="title-goals" name="title" type="text" maxlength="40" value="Meta de curtidas" />
+            <input name="titleColor" type="color" value="#ffd166" aria-label="Cor do título da meta" />
+          </div>
+          <label class="top-label" for="goal-metric">Métrica</label>
+          <select id="goal-metric" name="metric">
+            <option value="likes">Curtidas da live</option>
+            <option value="diamonds">Diamantes</option>
+            <option value="viewers">Espectadores</option>
+          </select>
+          <label class="top-label" for="goal-target">Alvo</label>
+          <input id="goal-target" name="target" type="number" min="1" max="1000000000" value="10000" />
+          <div class="color-grid">
+            <label class="color-field">Barra <input name="barColor" type="color" value="#ffd166" aria-label="Cor da barra da meta" /></label>
+            <label class="color-field">Fundo <input name="barTrackColor" type="color" value="#2a3140" aria-label="Cor do fundo da barra" /></label>
+            <label class="color-field">Números <input name="scoreColor" type="color" value="#ffffff" aria-label="Cor dos números da meta" /></label>
+          </div>
+          <label class="show-title"><input name="showCounts" type="checkbox" checked /> Mostrar atual / alvo</label>
+          <label class="show-title"><input name="showPercent" type="checkbox" checked /> Mostrar porcentagem</label>
+          <button type="submit">Salvar visual</button>
+          <p class="style-note"></p>
+        </form>
+        <div id="preview-goals" class="goal-preview">
+          <div class="goal-track"><div class="goal-fill"></div></div>
+          <div class="goal-meta">
+            <span class="goal-counts"></span>
+            <span class="goal-percent"></span>
+          </div>
+        </div>
+      </article>
     </section>
 
     <section class="panel limits">
@@ -120,6 +161,7 @@
         <li>Zerar ranking descarta esse status. Depois disso, curtidas e presentes contam só o que chegar em seguida.</li>
         <li>O ranking de quem mais curtiu não tem histórico por pessoa. Essa lista começa a preencher depois da conexão.</li>
         <li>A estimativa em dólar usa US$ 0,005 por diamante, a faixa comum do que o criador recebe. O valor pago de fato muda por país e pelo preço das moedas.</li>
+        <li>A meta usa os mesmos números da sessão. Zerar ranking também zera o progresso da barra; o alvo configurado permanece.</li>
         <li>Os links do overlay são desta conta. Outra pessoa neste computador usa os links da própria conta.</li>
       </ul>
     </section>
