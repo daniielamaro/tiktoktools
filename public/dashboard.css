@@ -261,6 +261,102 @@ code {
 .preview .score { font-variant-numeric: tabular-nums; font-weight: 700; }
 .preview .empty { display: block; color: var(--muted); }
 
+.style-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.show-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.style-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.style-row input[type="text"] { flex: 1; }
+
+.color-grid,
+.place-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+input[type="color"] {
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #101218;
+}
+
+.frame-pick {
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.frame-pick legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  padding: 4px;
+  background: #101218;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.thumb.none {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.thumb.selected { outline: 2px solid var(--gifts); }
+
+.style-note {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.style-note.error { color: var(--danger); }
+
 .limits ul {
   margin: 12px 0 0;
   padding-left: 18px;

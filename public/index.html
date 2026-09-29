@@ -30,6 +30,7 @@
           <button id="connect-btn" type="submit">Conectar</button>
           <button id="disconnect-btn" type="button" class="ghost" disabled>Desconectar</button>
           <button id="reset-btn" type="button" class="ghost" disabled>Zerar ranking</button>
+          <button id="preview-btn" type="button" class="ghost">Teste por 15 segundos</button>
         </div>
       </form>
       <div class="status-line">
@@ -54,6 +55,28 @@
         <label class="top-label" for="top-count">Posições no overlay</label>
         <input id="top-count" type="number" min="1" max="20" value="5" />
         <code id="url-likes"></code>
+        <form class="style-form" data-mode="likes">
+          <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+          <label class="top-label" for="title-likes">Título</label>
+          <div class="style-row">
+            <input id="title-likes" name="title" type="text" maxlength="40" value="Top curtidas" />
+            <input name="titleColor" type="color" value="#ff7a90" aria-label="Cor do título de curtidas" />
+          </div>
+          <div class="color-grid">
+            <label class="color-field">Nomes <input name="nameColor" type="color" value="#ffffff" aria-label="Cor dos nomes de curtidas" /></label>
+            <label class="color-field">Números <input name="scoreColor" type="color" value="#ffffff" aria-label="Cor dos números de curtidas" /></label>
+          </div>
+          <div class="place-colors">
+            <label class="color-field">1º nome <input name="nameColor1" type="color" value="#ffffff" aria-label="Cor do nome do primeiro em curtidas" /></label>
+            <label class="color-field">2º nome <input name="nameColor2" type="color" value="#ffffff" aria-label="Cor do nome do segundo em curtidas" /></label>
+            <label class="color-field">3º nome <input name="nameColor3" type="color" value="#ffffff" aria-label="Cor do nome do terceiro em curtidas" /></label>
+          </div>
+          <fieldset class="frame-pick" data-place="1"><legend>1º lugar</legend></fieldset>
+          <fieldset class="frame-pick" data-place="2"><legend>2º lugar</legend></fieldset>
+          <fieldset class="frame-pick" data-place="3"><legend>3º lugar</legend></fieldset>
+          <button type="submit">Salvar visual</button>
+          <p class="style-note"></p>
+        </form>
         <ol id="preview-likes" class="preview"></ol>
       </article>
       <article class="panel">
@@ -63,6 +86,28 @@
         </header>
         <p class="hint">Ordem por diamantes gastos nesta conexão.</p>
         <code id="url-gifts"></code>
+        <form class="style-form" data-mode="gifts">
+          <label class="show-title"><input name="showTitle" type="checkbox" checked /> Mostrar título</label>
+          <label class="top-label" for="title-gifts">Título</label>
+          <div class="style-row">
+            <input id="title-gifts" name="title" type="text" maxlength="40" value="Top presentes" />
+            <input name="titleColor" type="color" value="#7ef6ec" aria-label="Cor do título de presentes" />
+          </div>
+          <div class="color-grid">
+            <label class="color-field">Nomes <input name="nameColor" type="color" value="#ffffff" aria-label="Cor dos nomes de presentes" /></label>
+            <label class="color-field">Números <input name="scoreColor" type="color" value="#ffffff" aria-label="Cor dos números de presentes" /></label>
+          </div>
+          <div class="place-colors">
+            <label class="color-field">1º nome <input name="nameColor1" type="color" value="#ffffff" aria-label="Cor do nome do primeiro em presentes" /></label>
+            <label class="color-field">2º nome <input name="nameColor2" type="color" value="#ffffff" aria-label="Cor do nome do segundo em presentes" /></label>
+            <label class="color-field">3º nome <input name="nameColor3" type="color" value="#ffffff" aria-label="Cor do nome do terceiro em presentes" /></label>
+          </div>
+          <fieldset class="frame-pick" data-place="1"><legend>1º lugar</legend></fieldset>
+          <fieldset class="frame-pick" data-place="2"><legend>2º lugar</legend></fieldset>
+          <fieldset class="frame-pick" data-place="3"><legend>3º lugar</legend></fieldset>
+          <button type="submit">Salvar visual</button>
+          <p class="style-note"></p>
+        </form>
         <ol id="preview-gifts" class="preview"></ol>
       </article>
     </section>

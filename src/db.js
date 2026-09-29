@@ -27,3 +27,11 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
+
+const userColumns = new Set(db.prepare("PRAGMA table_info(users)").all().map((column) => column.name));
+if (!userColumns.has("overlay_likes")) {
+  db.exec("ALTER TABLE users ADD COLUMN overlay_likes TEXT NOT NULL DEFAULT ''");
+}
+if (!userColumns.has("overlay_gifts")) {
+  db.exec("ALTER TABLE users ADD COLUMN overlay_gifts TEXT NOT NULL DEFAULT ''");
+}

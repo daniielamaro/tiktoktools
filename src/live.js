@@ -41,11 +41,13 @@ function createSession(userId) {
     generation: 0,
     listeners: new Set(),
     broadcastTimer: null,
+    preview: null,
+    previewTimer: null,
   };
 
   return {
     getState() {
-      return snapshot(ctx.rankings);
+      return published(ctx);
     },
     subscribe(listener) {
       ctx.listeners.add(listener);
@@ -60,7 +62,14 @@ function createSession(userId) {
     reset() {
       return reset(ctx);
     },
+    preview() {
+      return startPreview(ctx);
+    },
   };
+}
+
+function published(ctx) {
+  return ctx.preview || snapshot(ctx.rankings);
 }
 
 function emitNow(ctx) {
@@ -68,7 +77,7 @@ function emitNow(ctx) {
     clearTimeout(ctx.broadcastTimer);
     ctx.broadcastTimer = null;
   }
-  const state = snapshot(ctx.rankings);
+  const state = published(ctx);
   for (const listener of ctx.listeners) listener(state);
 }
 
@@ -76,7 +85,7 @@ function scheduleBroadcast(ctx) {
   if (ctx.broadcastTimer) return;
   ctx.broadcastTimer = setTimeout(() => {
     ctx.broadcastTimer = null;
-    const state = snapshot(ctx.rankings);
+    const state = published(ctx);
     for (const listener of ctx.listeners) listener(state);
   }, 250);
 }
@@ -252,17 +261,70 @@ async function connect(ctx, rawUniqueId) {
 
 async function disconnect(ctx) {
   ctx.generation += 1;
+  clearPreview(ctx);
   await closeConnection(ctx);
   ctx.rankings = createRankings();
   emitNow(ctx);
-  return snapshot(ctx.rankings);
+  return published(ctx);
 }
 
 function reset(ctx) {
   if (ctx.rankings.status !== "live" && ctx.rankings.status !== "connecting" && ctx.rankings.status !== "offline") {
-    return snapshot(ctx.rankings);
+    return published(ctx);
   }
+  clearPreview(ctx);
   resetScores(ctx.rankings);
   emitNow(ctx);
-  return snapshot(ctx.rankings);
+  return published(ctx);
+}
+
+const PREVIEW_MS = 15_000;
+const PREVIEW_NAMES = ["Luna", "Miguel", "Helena", "Caio", "Alice", "Bruno", "Valentina", "Davi", "Sofia", "Enzo"];
+
+function avatarFor(name, hue) {
+  const letter = name.charAt(0);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" fill="hsl(${hue} 52% 42%)"/><text x="48" y="62" text-anchor="middle" font-size="42" font-family="Segoe UI,sans-serif" fill="white">${letter}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function previewPeople() {
+  const names = [...PREVIEW_NAMES].sort(() => Math.random() - 0.5).slice(0, 5);
+  return names.map((name, index) => ({
+    uniqueId: name.toLowerCase(),
+    nickname: name,
+    avatar: avatarFor(name, (index * 67 + name.length * 40) % 360),
+  }));
+}
+
+function clearPreview(ctx) {
+  if (ctx.previewTimer) {
+    clearTimeout(ctx.previewTimer);
+    ctx.previewTimer = null;
+  }
+  ctx.preview = null;
+}
+
+function startPreview(ctx) {
+  clearPreview(ctx);
+  const people = previewPeople();
+  const likeScores = [1840, 1260, 980, 410, 155];
+  const giftScores = [860, 540, 310, 120, 40];
+  const real = snapshot(ctx.rankings);
+  ctx.preview = {
+    ...real,
+    message: "Teste de 15 segundos. Estes nomes não são da live.",
+    totalLikesKnown: true,
+    totalLikes: likeScores.reduce((sum, value) => sum + value, 0),
+    trackedLikes: likeScores.reduce((sum, value) => sum + value, 0),
+    totalDiamonds: giftScores.reduce((sum, value) => sum + value, 0),
+    topLikers: people.map((person, index) => ({ ...person, likes: likeScores[index] })),
+    topGifters: [...people].reverse().map((person, index) => ({ ...person, diamonds: giftScores[index] })),
+  };
+  emitNow(ctx);
+  ctx.previewTimer = setTimeout(() => {
+    ctx.previewTimer = null;
+    ctx.preview = null;
+    emitNow(ctx);
+  }, PREVIEW_MS);
+  return published(ctx);
 }

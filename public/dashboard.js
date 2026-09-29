@@ -5,6 +5,7 @@ const uniqueIdInput = document.querySelector("#unique-id");
 const connectBtn = document.querySelector("#connect-btn");
 const disconnectBtn = document.querySelector("#disconnect-btn");
 const resetBtn = document.querySelector("#reset-btn");
+const previewBtn = document.querySelector("#preview-btn");
 const statusPill = document.querySelector("#status-pill");
 const statusMessage = document.querySelector("#status-message");
 const topCount = document.querySelector("#top-count");
@@ -48,6 +49,113 @@ function renderUrls() {
   const urls = overlayUrls();
   urlLikes.textContent = urls.likes;
   urlGifts.textContent = urls.gifts;
+}
+
+const PLACE_LABEL = { 1: "1º lugar", 2: "2º lugar", 3: "3º lugar" };
+
+function selectedFile(form, place) {
+  const button = form.querySelector(`[data-place="${place}"] .thumb.selected`);
+  return button?.dataset.file || "";
+}
+
+function colorValue(value) {
+  return /^#[0-9a-fA-F]{6}$/.test(value || "") ? value : "#ffffff";
+}
+
+function fillForm(form, catalog, style) {
+  form.showTitle.checked = Boolean(style.showTitle);
+  form.title.value = style.title || "";
+  form.titleColor.value = colorValue(style.titleColor);
+  form.nameColor.value = colorValue(style.nameColor);
+  form.scoreColor.value = colorValue(style.scoreColor);
+  form.dataset.generalName = form.nameColor.value;
+  for (const place of ["1", "2", "3"]) {
+    form[`nameColor${place}`].value = colorValue(style.placeNameColors?.[place] || style.nameColor);
+    const field = form.querySelector(`[data-place="${place}"]`);
+    const chosen = style.frames?.[place] || "";
+    const buttons = [];
+    const none = document.createElement("button");
+    none.type = "button";
+    none.className = `thumb none${chosen ? "" : " selected"}`;
+    none.dataset.file = "";
+    none.textContent = "Sem moldura";
+    buttons.push(none);
+    for (const item of catalog[place] || []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `thumb${item.file === chosen ? " selected" : ""}`;
+      button.dataset.file = item.file;
+      const image = document.createElement("img");
+      image.alt = `${PLACE_LABEL[place]} ${item.file}`;
+      image.src = item.url;
+      button.append(image);
+      buttons.push(button);
+    }
+    const row = document.createElement("div");
+    row.className = "thumbs";
+    row.replaceChildren(...buttons);
+    field.querySelector(".thumbs")?.remove();
+    field.append(row);
+    row.addEventListener("click", (event) => {
+      const thumb = event.target.closest(".thumb");
+      if (!thumb) return;
+      row.querySelectorAll(".thumb").forEach((item) => item.classList.remove("selected"));
+      thumb.classList.add("selected");
+    });
+  }
+}
+
+function bindStyleForms(payload) {
+  document.querySelectorAll(".style-form").forEach((form) => {
+    const style = payload[form.dataset.mode];
+    if (style) fillForm(form, payload.catalog || {}, style);
+    if (form.dataset.bound) return;
+    form.dataset.bound = "1";
+    form.nameColor.addEventListener("input", () => {
+      const previous = (form.dataset.generalName || "").toLowerCase();
+      const next = form.nameColor.value;
+      for (const place of ["1", "2", "3"]) {
+        const input = form[`nameColor${place}`];
+        if (input.value.toLowerCase() === previous) input.value = next;
+      }
+      form.dataset.generalName = next;
+    });
+    const note = form.querySelector(".style-note");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = form.querySelector("button[type='submit']");
+      button.disabled = true;
+      note.textContent = "";
+      try {
+        const saved = await post("/api/overlay-style", {
+          mode: form.dataset.mode,
+          showTitle: form.showTitle.checked,
+          title: form.title.value,
+          titleColor: form.titleColor.value,
+          nameColor: form.nameColor.value,
+          scoreColor: form.scoreColor.value,
+          placeNameColors: {
+            1: form.nameColor1.value,
+            2: form.nameColor2.value,
+            3: form.nameColor3.value,
+          },
+          frames: {
+            1: selectedFile(form, "1"),
+            2: selectedFile(form, "2"),
+            3: selectedFile(form, "3"),
+          },
+        });
+        fillForm(form, saved.catalog || {}, saved[form.dataset.mode]);
+        note.className = "style-note";
+        note.textContent = "Visual salvo.";
+      } catch (err) {
+        note.className = "style-note error";
+        note.textContent = err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 function renderPreview(list, rows, scoreKey, suffix) {
@@ -132,6 +240,31 @@ resetBtn.addEventListener("click", async () => {
   }
 });
 
+previewBtn.addEventListener("click", async () => {
+  const label = "Teste por 15 segundos";
+  previewBtn.disabled = true;
+  let left = 15;
+  previewBtn.textContent = `Testando… ${left}s`;
+  const timer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(timer);
+      previewBtn.disabled = false;
+      previewBtn.textContent = label;
+      return;
+    }
+    previewBtn.textContent = `Testando… ${left}s`;
+  }, 1000);
+  try {
+    render(await post("/api/preview"));
+  } catch (err) {
+    clearInterval(timer);
+    previewBtn.disabled = false;
+    previewBtn.textContent = label;
+    statusMessage.textContent = err.message;
+  }
+});
+
 topCount.addEventListener("input", () => {
   renderUrls();
   if (state) render(state);
@@ -185,6 +318,8 @@ async function boot() {
   accountName.textContent = me.username || "";
   if (me.tiktokUniqueId && !uniqueIdInput.value) uniqueIdInput.value = me.tiktokUniqueId;
   renderUrls();
+  const styleResponse = await fetch("/api/overlay-style");
+  if (styleResponse.ok) bindStyleForms(await styleResponse.json());
   const stateResponse = await fetch("/api/state");
   if (stateResponse.ok) render(await stateResponse.json());
   connectSocket();

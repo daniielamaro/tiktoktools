@@ -13,6 +13,7 @@ import {
   userFromSession,
 } from "./auth.js";
 import { dropLiveSession, getLiveSession } from "./live.js";
+import { listFrames, readStyles, saveStyle } from "./overlay-style.js";
 
 const PORT = 8787;
 const HOST = "0.0.0.0";
@@ -33,6 +34,10 @@ const TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
   ".ico": "image/x-icon",
 };
 
@@ -123,6 +128,38 @@ function redirect(res, location) {
   res.end();
 }
 
+const socketsByUser = new Map();
+
+function trackSocket(userId, socket) {
+  let sockets = socketsByUser.get(userId);
+  if (!sockets) {
+    sockets = new Set();
+    socketsByUser.set(userId, sockets);
+  }
+  sockets.add(socket);
+  socket.on("close", () => {
+    sockets.delete(socket);
+    if (!sockets.size) socketsByUser.delete(userId);
+  });
+}
+
+function pushStyle(userId) {
+  const payload = JSON.stringify({ type: "style", style: readStyles(userId) });
+  for (const socket of socketsByUser.get(userId) || []) {
+    if (socket.readyState === 1) socket.send(payload);
+  }
+}
+
+function userFromKeyOrSession(req, key) {
+  const user = key ? userByOverlayKey(key) : requireUser(req);
+  if (!user) {
+    const error = new Error("Chave do overlay inválida.");
+    error.statusCode = 404;
+    throw error;
+  }
+  return user;
+}
+
 function requireUser(req) {
   const user = currentUser(req);
   if (!user) {
@@ -168,14 +205,35 @@ async function handleRequest(req, res) {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/api/frames") {
+      sendJson(res, 200, listFrames());
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/overlay-style") {
+      const user = userFromKeyOrSession(req, url.searchParams.get("key"));
+      sendJson(res, 200, readStyles(user.id));
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/overlay-style") {
+      const user = requireUser(req);
+      const body = await readBody(req);
+      const style = saveStyle(user.id, body.mode, body);
+      pushStyle(user.id);
+      sendJson(res, 200, style);
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/api/state") {
-      const key = url.searchParams.get("key");
-      const user = key ? userByOverlayKey(key) : requireUser(req);
-      if (!user) {
-        sendJson(res, 404, { error: "Chave do overlay inválida." });
-        return;
-      }
+      const user = userFromKeyOrSession(req, url.searchParams.get("key"));
       sendJson(res, 200, getLiveSession(user.id).getState());
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/preview") {
+      const user = requireUser(req);
+      sendJson(res, 200, getLiveSession(user.id).preview());
       return;
     }
 
@@ -251,10 +309,14 @@ wss.on("connection", (socket, req) => {
     socket.close(1008, "sem conta");
     return;
   }
+  trackSocket(user.id, socket);
   const live = getLiveSession(user.id);
   const send = (state) => {
     if (socket.readyState === 1) socket.send(JSON.stringify({ type: "state", state }));
   };
+  if (socket.readyState === 1) {
+    socket.send(JSON.stringify({ type: "style", style: readStyles(user.id) }));
+  }
   send(live.getState());
   const unsubscribe = live.subscribe(send);
   socket.on("close", unsubscribe);
