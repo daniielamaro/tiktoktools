@@ -23,7 +23,7 @@ metadata:
   labels:
     app: tiktok-tools
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: tiktok-tools
@@ -34,6 +34,16 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      initContainers:
+        - name: data-permissions
+          image: tiktok-tools:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "chown -R 1000:1000 /app/data && chmod 775 /app/data"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
       containers:
         - name: tiktok-tools
           image: tiktok-tools:latest
