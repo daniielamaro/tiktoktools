@@ -12,7 +12,7 @@ export function createRankings() {
     startedAt: 0,
     totalLikes: 0,
     totalLikesKnown: false,
-    baselineOpen: true,
+    baselineOpen: false,
     holdEvents: false,
     likers: new Map(),
     gifters: new Map(),
@@ -29,6 +29,7 @@ export function createRankings() {
     recentShares: [],
     recentJoins: [],
     spin: null,
+    giftGroups: new Set(),
     countdownEndsAt: 0,
     diamondBank: 0,
     goalBaseline: null,
@@ -125,19 +126,11 @@ export function giftPictureOf(data) {
 }
 
 export function addLike(rankings, data) {
-  const total = Number(data?.totalLikeCount ?? data?.total);
-  const likeCount = Number(data?.likeCount ?? data?.count);
-  if (rankings.baselineOpen) {
-    if (Number.isFinite(total) && total >= rankings.totalLikes) {
-      rankings.totalLikes = total;
-      rankings.totalLikesKnown = true;
-    }
-  } else if (Number.isFinite(likeCount) && likeCount > 0) {
-    rankings.totalLikes += likeCount;
-    rankings.totalLikesKnown = true;
-  }
   if (rankings.holdEvents) return;
+  const likeCount = Number(data?.likeCount ?? data?.count);
   if (!Number.isFinite(likeCount) || likeCount <= 0) return;
+  rankings.totalLikes += likeCount;
+  rankings.totalLikesKnown = true;
   const identity = identityFrom(data);
   if (!identity.uniqueId) return;
   const row = touch(rankings.likers, identity, { likes: 0 });
@@ -205,6 +198,13 @@ export function addGift(rankings, data) {
 
   const identity = identityFrom(data);
   if (!identity.uniqueId) return null;
+
+  const groupId = String(data?.groupId || data?.group_id || "");
+  if (groupId) {
+    if (!rankings.giftGroups) rankings.giftGroups = new Set();
+    if (rankings.giftGroups.has(groupId)) return null;
+    rankings.giftGroups.add(groupId);
+  }
 
   const repeatCount = Math.max(1, Number(data?.repeatCount) || 1);
   const diamonds = diamondUnit(data) * repeatCount;
@@ -393,6 +393,7 @@ export function resetScores(rankings) {
   rankings.recentShares = [];
   rankings.recentJoins = [];
   rankings.spin = null;
+  rankings.giftGroups = new Set();
   rankings.peakViewers = rankings.viewers;
   rankings.diamondBank = 0;
   rankings.goalBaseline = null;

@@ -640,14 +640,24 @@ function paintAlert(event) {
   showStage(wrap);
 }
 
+function clearAlertStage() {
+  title.hidden = true;
+  title.textContent = "";
+  goal.hidden = true;
+  rows.hidden = true;
+  stage.hidden = true;
+  stage.replaceChildren();
+}
+
 function pumpAlerts() {
   if (alertBusy || mode !== "alerts") return;
   const event = alertQueue.shift();
   if (!event) {
-    if (!stage.firstElementChild) waitingStage("Aguardando alertas");
+    clearAlertStage();
     return;
   }
   alertBusy = true;
+  applyTitle();
   paintAlert(event);
   const ms = Math.max(2000, (Number(currentStyle().duration) || 5) * 1000);
   setTimeout(() => {
@@ -680,7 +690,7 @@ function handleEvent(event) {
 
 function paintTool() {
   if (mode === "alerts") {
-    if (!alertBusy && !alertQueue.length) waitingStage("Aguardando alertas");
+    if (!alertBusy && !alertQueue.length) clearAlertStage();
     return;
   }
   if (mode === "ticker") return paintTicker();
@@ -706,6 +716,10 @@ function render(state) {
     lastState = { ...lastState, durationMs: Date.now() - lastState.startedAt };
   }
   warmImages();
+  if (mode === "alerts") {
+    if (!alertBusy && !alertQueue.length) clearAlertStage();
+    return;
+  }
   applyTitle();
   if (missingKey) {
     goal.hidden = true;

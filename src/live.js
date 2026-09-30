@@ -13,7 +13,6 @@ import {
   addJoin,
   addLike,
   addShare,
-  applyGiftRanks,
   createRankings,
   normalizeUniqueId,
   resetScores,
@@ -159,18 +158,6 @@ function viewersFromRoomInfo(roomInfo) {
   return countFrom([data?.user_count, data?.userCount, data?.viewer_count, data?.viewerCount]);
 }
 
-function likesFromRoomInfo(roomInfo) {
-  const data = roomInfo?.data && typeof roomInfo.data === "object" ? roomInfo.data : roomInfo;
-  if (!data) return null;
-  const total = countFrom([
-    data.like_count,
-    data.likeCount,
-    data.stats?.like_count,
-    data.stats?.digg_count,
-  ]);
-  return total > 0 ? total : null;
-}
-
 function withGiftInfo(data, gifts) {
   if (!data || data.extendedGiftInfo || !Array.isArray(gifts)) return data;
   const giftId = String(data.giftId ?? data.gift?.id ?? "");
@@ -278,9 +265,7 @@ function bindConnection(ctx, current, generation) {
   current.on(WebcastEvent.ROOM_USER, (data) => {
     if (!stillCurrent()) return;
     const viewers = viewersFromRoomUser(data);
-    const viewersChanged = viewers !== null && setViewers(ctx.rankings, viewers);
-    if (applyGiftRanks(ctx.rankings, data?.ranks)) scheduleBroadcast(ctx);
-    else if (viewersChanged) scheduleBroadcast(ctx);
+    if (viewers !== null && setViewers(ctx.rankings, viewers)) scheduleBroadcast(ctx);
   });
 
   current.on(WebcastEvent.STREAM_END, () => {
@@ -317,6 +302,7 @@ async function connect(ctx, rawUniqueId) {
   ctx.rankings.status = "connecting";
   ctx.rankings.uniqueId = uniqueId;
   ctx.rankings.message = "Conectando na live…";
+  ctx.rankings.baselineOpen = false;
   ctx.rankings.holdEvents = true;
   ctx.rankings.startedAt = Date.now();
   ctx.historySaved = false;
@@ -324,7 +310,8 @@ async function connect(ctx, rawUniqueId) {
   emitNow(ctx);
 
   const next = new TikTokLiveConnection(uniqueId, {
-    processInitialData: true,
+    processInitialData: false,
+    enableExtendedGiftInfo: true,
   });
   ctx.connection = next;
   bindConnection(ctx, next, generation);
@@ -337,11 +324,6 @@ async function connect(ctx, rawUniqueId) {
     ctx.rankings.message = "";
     const viewerCount = viewersFromRoomInfo(next.roomInfo);
     if (viewerCount !== null) setViewers(ctx.rankings, viewerCount);
-    const roomLikes = likesFromRoomInfo(next.roomInfo);
-    if (roomLikes !== null) {
-      ctx.rankings.totalLikes = roomLikes;
-      ctx.rankings.totalLikesKnown = true;
-    }
     ctx.rankings.holdEvents = false;
     emitNow(ctx);
     return snapshot(ctx.rankings);
