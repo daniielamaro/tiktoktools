@@ -311,7 +311,6 @@ async function connect(ctx, rawUniqueId) {
 
   const next = new TikTokLiveConnection(uniqueId, {
     processInitialData: false,
-    enableExtendedGiftInfo: true,
   });
   ctx.connection = next;
   bindConnection(ctx, next, generation);
